@@ -5,11 +5,17 @@ Feature Selection : solving the problem and application to signal processing
 
 This project is a part of the course "Optimization Methods: Theory and Applications" at the Wroclaw Univeristy of Science and Technology (project).
 
-It aims to study the Permutation Flowshop Scheduling Problem (PFSP) which is an NP-hard problem. The purpose of this project is to compare efficently different algorithms to solve it. We will compare:
+It aims to study the Feature Selection which is an NP-hard problem. The purpose of this project is to compare efficently different algorithms to solve it. We will compare:
 
-- random search
-- greedy
-- Evolutionary Algorithm (EA) with different parameters
+- Simulated Annealing (SA) with two parameters
+  - initial temperature
+  - cooling rate
+- Differential Evolution (DE) (to be continued)
+- Particle Swarm Optimization (PSO) (to be continued)
+
+(MAYBE)
+- random search (maybe)
+- Evolutionary Algorithm (EA) with different parameters (maybe)
   - Population size
   - Crossover probability
   - Mutation probability
@@ -17,11 +23,21 @@ It aims to study the Permutation Flowshop Scheduling Problem (PFSP) which is an 
   - Number of generation
   - Crossover methods : OX and PMX
   - Mutation methods : Swap or Inversion
-- Simulated Annealing with two parameters
-  - initial temperature
-  - cooling rate
+
+In order to do that, we will use (and compare ?) Machine Learning:
+
+- kNN for light model
+- SVM for heavy model used as a baseline (comparison with others ?)
+
+## Use
+
+1) Load the project
+2) On the main folder, run `python -m app.main`
+3) If you want to access a specific file (e.g., a Test File), use `python -m app.Tests.TestSA`
 
 ## Datasets
+
+Description TO DO
 
 1) https://archive.ics.uci.edu/dataset/174/parkinsons
 2) https://archive.ics.uci.edu/dataset/17/breast+cancer+wisconsin+diagnostic
