@@ -1,0 +1,4 @@
+I) heavy model on the whole dataset (SVM ?)
+II) Differential Evolution E, (TS ? just two), PSO (standard and optimized) using a light model (kNN with small k) as fitness
+III) take the best subset of features for each heuristics and test it on heavy model
+IV) compare the result of algorithmes compared to heavy models ?

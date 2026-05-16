@@ -1,0 +1,18 @@
+{
+    "dataset_ids": [0, 174, 17, 52, 151],
+    
+    "runs_per_algo": 10,
+    "total_evals": 10,
+
+    "cases_SA_initial_temp": [
+        {"id": "1", "initial_temp": 100, "cooling_rate": 0.99},
+        {"id": "2", "initial_temp": 1000, "cooling_rate": 0.99},
+        {"id": "3", "initial_temp": 10000, "cooling_rate": 0.99}
+    ],
+    "cases_SA_cooling_rate": [
+        {"id": "4", "initial_temp": 1000, "cooling_rate": 0.90},
+        {"id": "5", "initial_temp": 1000, "cooling_rate": 0.99},
+        {"id": "6", "initial_temp": 1000, "cooling_rate": 0.999},
+        {"id": "7", "initial_temp": 1000, "cooling_rate": 0.9999}
+    ]
+}
