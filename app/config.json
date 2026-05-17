@@ -1,8 +1,8 @@
 {
-    "dataset_ids": [0, 174, 17, 52, 151],
-    
-    "runs_per_algo": 10,
-    "total_evals": 10,
+    "dataset_ids": [174, 17, 52, 151, 0],
+
+    "runs_per_algo": 5,
+    "total_evals": 5000,
 
     "cases_SA_initial_temp": [
         {"id": "1", "initial_temp": 100, "cooling_rate": 0.99},

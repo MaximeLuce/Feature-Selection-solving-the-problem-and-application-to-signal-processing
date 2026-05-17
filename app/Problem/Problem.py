@@ -9,12 +9,12 @@ class Problem:
     Represents the Feature Selection problem and contain the fitness function
     """
     
-    def __init__(self, X, y, metadata, k=6):
+    def __init__(self, X, y, metadata, alpha=0.5, k=6):
         self.X = X
         self.y = y
         self.num_features = X.shape[1] # total number of columns=features
         self.num_instances = metadata.num_instances
-
+        self.alpha = alpha #weight between error and number of features
         # light model for heuristique
         self.model = KNeighborsClassifier(n_neighbors=k) 
         self.evaluations_count = 0
@@ -58,7 +58,12 @@ class Problem:
         
         # we return the error (1 - accuracy) because using PFSP tools, we optimize by trying to get minimal value
         error = 1.0 - mean_accuracy
+
+        feature_ratio = num_selected / self.num_features
         
+        # weightened fitness
+
+        fitness = (self.alpha * error) + ((1.0 - self.alpha) * feature_ratio)
         return error
 
 
