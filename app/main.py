@@ -12,8 +12,7 @@ from app.runners.comparison_runner import ComparisonRunner
 from app.runners.ea_convergence import EAConvergence
 from app.runners.ea_parameters import EAParameters
 from app.runners.sa_parameters import SAParameters
-from app.runners.de_parameters import DEParameters
-from app.runners.de_parameters_parallel import DEParametersParallell
+from app.runners.de_parameters import DEParameters, DEParametersParallell
 
 if __name__ == "__main__":
     #runner = EAParameters()

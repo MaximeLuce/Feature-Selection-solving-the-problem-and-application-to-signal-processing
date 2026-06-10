@@ -1,5 +1,4 @@
-import numpy as np
-
+# featureselection.py
 
 class FeatureSelectionProblem:
     def __init__(self, problem, decoder):

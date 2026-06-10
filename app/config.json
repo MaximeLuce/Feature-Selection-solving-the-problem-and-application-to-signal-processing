@@ -3,6 +3,20 @@
 
     "runs_per_algo": 2,
     "total_evals": 5000,
+    "evaluation_cases": [
+        {
+            "evaluation_model": "svm",
+            "fitness": "weighted_error",
+            "alpha": 0.5,
+            "cv_folds": 5
+        },
+        {
+            "evaluation_model": "knn",
+            "fitness": "weighted_error",
+            "alpha": 0.5,
+            "cv_folds": 5
+        }
+    ],
 
     "cases_SA_initial_temp": [
         {"id": "1", "initial_temp": 100, "cooling_rate": 0.99},
