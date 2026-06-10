@@ -5,6 +5,7 @@ class SigmaDecoder:
     def __init__(self, threshold: float = 0.5, bounds=None):
         self.threshold = float(threshold)
         self.value_bounds = np.asarray(bounds or [-6.0, 6.0], dtype=float)
+        self.name = 'sigma'
 
         if self.value_bounds.shape != (2,):
             raise ValueError("Sigma decoder bounds must be a pair: [low, high].")

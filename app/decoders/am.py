@@ -60,6 +60,7 @@ class AMDecoder:
             key: list(source_bounds.get(key, default))
             for key, default in self.DEFAULT_BOUNDS.items()
         }
+        self.name = 'am'
 
     def bounds(self, num_features: int) -> np.ndarray:
         return np.asarray(

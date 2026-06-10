@@ -1,36 +1,72 @@
-import numpy as np
-from sklearn.neighbors import KNeighborsClassifier
-from sklearn.model_selection import cross_val_score
+# problem.py
 
 from app.Problem.DataLoader import DataLoader
+from app.Problem.Evaluator import Evaluator, KNNEvaluator, SVMEvaluator
+from app.Problem.Fitness import ErrorFitness, Fitness, WeightedErrorFitness
+from app.Utilities.ConfigLoader import load_config
+
 
 class Problem:
     """
     Represents the Feature Selection problem and contain the fitness function
     """
-    
-    def __init__(self, X, y, metadata, alpha=0.5, k=6):
+
+    def __init__(self, X, y, metadata, evaluator, fitness):
         self.X = X
         self.y = y
-        self.num_features = X.shape[1] # total number of columns=features
+        self.metadata = metadata
+        self.num_features = X.shape[1]
         self.num_instances = metadata.num_instances
-        self.alpha = alpha #weight between error and number of features
-        # light model for heuristique
-        self.model = KNeighborsClassifier(n_neighbors=k) 
+        self.evaluator: Evaluator = evaluator
+        self.fitness: Fitness = fitness
+        self.evaluation_model = evaluator.name
+        self.fitness_name = fitness.name
+        self.alpha = getattr(fitness, "alpha", None)
+        self.cv_folds = getattr(evaluator, "cv_folds", None)
+        self.y_values = self.y.values.ravel()
         self.evaluations_count = 0
 
     def __str__(self):
-        return f'Problem loaded: dataset with {self.num_features} features and {self.num_instances} instances.'
-    
+        return (
+            f"Problem loaded: dataset with {self.num_features} "
+            f"features and {self.num_instances} instances."
+            f" Evaluator: {self.evaluation_model}, "
+            f"Fitness: {self.fitness_name}"
+        )
+
     def reset_counter(self):
-        """Reset evaluations_count counter to zéro."""
         self.evaluations_count = 0
-        
+
     @classmethod
-    def load_dataset(cls, dataset_id, k=3):
-        """Alternative constructor to instanciate from dataset."""
+    def load_dataset(cls, dataset_id, evaluation_config=None):
+        config = load_config()
+        evaluation_config = evaluation_config or {}
+        evaluation_model = evaluation_config.get(
+            "evaluation_model",
+            config.get("evaluation_model", "svm"),
+        )
+        fitness_name = evaluation_config.get(
+            "fitness",
+            config.get("fitness", "weighted_error"),
+        )
+
         X, y, metadata = DataLoader.load_data(dataset_id)
-        return cls(X, y, metadata, k=k)
+        if evaluation_model == "svm":
+            evaluator = SVMEvaluator()
+        elif evaluation_model == "knn":
+            evaluator = KNNEvaluator()
+        else:
+            raise ValueError(f"Unknown evaluation model: {evaluation_model}")
+
+        if fitness_name == "error":
+            fitness = ErrorFitness()
+        elif fitness_name == "weighted_error":
+            alpha = evaluation_config.get("alpha", config.get("alpha", 0.5))
+            fitness = WeightedErrorFitness(alpha)
+        else:
+            raise ValueError(f"Unknown fitness: {fitness_name}")
+
+        return cls(X, y, metadata, evaluator, fitness)
 
     def evaluate(self, feature_mask):
         """
@@ -38,31 +74,14 @@ class Problem:
         feature_mask: binar list (ex: [1, 0, 1, 0...]) of size num_features
         """
         self.evaluations_count += 1
-        
-        # get the index of selected features
+
         selected_indices = [i for i, bit in enumerate(feature_mask) if bit == 1]
-        
-        # if no selected feature, we render maximal penality
+
         if len(selected_indices) == 0:
-            return 1.0 
-            
-        # filter the dataset to keep selected features
+            return 1.0
+
         X_subset = self.X.iloc[:, selected_indices]
-        
-        # formatting y for scikit-learn (debugging))
-        y_values = self.y.values.ravel()
-        
-        # crossed validation evaluation (5-fold)
-        scores = cross_val_score(self.model, X_subset, y_values, cv=5, scoring='accuracy')
-        mean_accuracy = scores.mean()
-        
-        # we return the error (1 - accuracy) because using PFSP tools, we optimize by trying to get minimal value
-        error = 1.0 - mean_accuracy
-
+        accuracy = self.evaluator.evaluate(X_subset, self.y_values)
+        error = 1.0 - accuracy
         feature_ratio = len(selected_indices) / self.num_features
-        
-        # weightened fitness
-        fitness = (self.alpha * error) + ((1.0 - self.alpha) * feature_ratio)
-        return fitness
-
-
+        return self.fitness.compute(error, feature_ratio)

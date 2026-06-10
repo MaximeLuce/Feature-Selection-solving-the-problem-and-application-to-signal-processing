@@ -19,7 +19,7 @@ class DEParameters:
         config = load_config()
         self.dataset_ids = config.get("dataset_ids", [0])
         self.runs_per_algo = config.get("runs_per_algo", 10)
-        self.cases = config.get("cases_DE_decoding", [])
+        self.cases = config.get("cases_DE_strategy", [])
 
         if not self.cases:
             print("No DE cases config has been loaded.")
@@ -44,7 +44,7 @@ class DEParameters:
 
         
     def run_all(self):
-        csv_filepath = "app/Results/SAParameters/DEParameters.csv"
+        csv_filepath = "app/Results/SAParameters/DEPaarameters_strategy.csv"
 
         print(f"Start running... Results will be saved to {csv_filepath}")
 

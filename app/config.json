@@ -1,7 +1,7 @@
 {
     "dataset_ids": [174, 17, 52, 151, 0],
 
-    "runs_per_algo": 5,
+    "runs_per_algo": 2,
     "total_evals": 5000,
 
     "cases_SA_initial_temp": [
@@ -42,6 +42,68 @@
             "CR": 0.7,
             "decoder": {
                 "name": "am"
+            }
+        }
+    ],
+    "cases_DE_strategy": [
+        {
+            "id": "rand/1",
+            "popsize": 50,
+            "max_generations": 10,
+            "seed": 42,
+            "strategy": "rand/1",
+            "F1": 0.5,
+            "F2": 0.5,
+            "CR": 0.7,
+            "decoder": {
+                "name": "sigma",
+                "threshold": 0.5,
+                "bounds": [-6.0, 6.0]
+            }
+        },
+        {
+            "id": "rand/2",
+            "popsize": 50,
+            "max_generations": 10,
+            "seed": 42,
+            "strategy": "rand/2",
+            "F1": 0.5,
+            "F2": 0.5,
+            "CR": 0.7,
+            "decoder": {
+                "name": "sigma",
+                "threshold": 0.5,
+                "bounds": [-6.0, 6.0]
+            }
+        },
+        {
+            "id": "best/1",
+            "popsize": 50,
+            "max_generations": 10,
+            "seed": 42,
+            "strategy": "best/1",
+            "F1": 0.5,
+            "F2": 0.5,
+            "CR": 0.7,
+            "decoder": {
+                "name": "sigma",
+                "threshold": 0.5,
+                "bounds": [-6.0, 6.0]
+            }
+        },
+        {
+            "id": "best/2",
+            "popsize": 50,
+            "max_generations": 10,
+            "seed": 42,
+            "strategy": "best/2",
+            "F1": 0.5,
+            "F2": 0.5,
+            "CR": 0.7,
+            "decoder": {
+                "name": "sigma",
+                "threshold": 0.5,
+                "bounds": [-6.0, 6.0]
             }
         }
     ]

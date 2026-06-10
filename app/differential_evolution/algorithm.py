@@ -1,15 +1,10 @@
 # algorithm.py
 
 import numpy as np
-from .monitoring import Monitor
+from .monitoring import Event, Monitor, MonitoringEvent
+from .results import DEResult
 
 
-            
-class Result:
-    def __init__(self, best: np.ndarray, best_fitness: float):
-        self.best = best
-        self.best_fitness = best_fitness
-        
 class Algorithm:
     def __init__(self, problem):
         self.problem = problem
@@ -19,48 +14,62 @@ class Algorithm:
     def reset(self):
         self.best = None
         self.best_fitness = np.inf
-        
-    def run(self) -> Result:
+
+    def run(self) -> DEResult:
         raise NotImplementedError
+
 
 class DifferentialEvolution(Algorithm):
     STRATEGY_METHODS = {
-        'rand/1': ('_mutate_rand_1', 3),
-        'best/1': ('_mutate_best_1', 2),
-        'rand/2': ('_mutate_rand_2', 5),
-        'best/2': ('_mutate_best_2', 4),
-        'current-to-best/1': ('_mutate_current_to_best_1', 2),
-        'current-to-rand/1': ('_mutate_current_to_rand_1', 3),
+        "rand/1": ("_mutate_rand_1", 3),
+        "best/1": ("_mutate_best_1", 2),
+        "rand/2": ("_mutate_rand_2", 5),
+        "best/2": ("_mutate_best_2", 4),
+        "current-to-best/1": ("_mutate_current_to_best_1", 2),
+        "current-to-rand/1": ("_mutate_current_to_rand_1", 3),
     }
-    
+
     DEFAULT_CONFIG = {
-        'popsize': 100,
-        'F1': 0.5,
-        'F2': 0.5,
-        'CR': 0.7,
-        'strategy': 'rand/1',
-        'max_generations': 1000,
-        'seed': None,
+        "popsize": 100,
+        "F1": 0.5,
+        "F2": 0.5,
+        "CR": 0.7,
+        "strategy": "rand/1",
+        "max_generations": 1000,
+        "seed": None,
+        "target_fitness": 0.01,
+        "monitoring": {
+            "metrics": [],
+        },
     }
 
     def __init__(self, problem, config=None):
         super().__init__(problem)
         config = config or {}
-        self.popsize = config.get('popsize', self.DEFAULT_CONFIG['popsize'])
-        self.F1 = config.get('F1', self.DEFAULT_CONFIG['F1'])
-        self.F2 = config.get('F2', self.DEFAULT_CONFIG['F2'])
-        self.CR = config.get('CR', self.DEFAULT_CONFIG['CR'])
-        self.strategy = config.get('strategy', self.DEFAULT_CONFIG['strategy'])
-        self.max_generations = config.get('max_generations', self.DEFAULT_CONFIG['max_generations'])
-        self.seed = config.get('seed', self.DEFAULT_CONFIG['seed'])
+        self.popsize = config.get("popsize", self.DEFAULT_CONFIG["popsize"])
+        self.F1 = config.get("F1", self.DEFAULT_CONFIG["F1"])
+        self.F2 = config.get("F2", self.DEFAULT_CONFIG["F2"])
+        self.CR = config.get("CR", self.DEFAULT_CONFIG["CR"])
+        self.strategy = config.get("strategy", self.DEFAULT_CONFIG["strategy"])
+        self.max_generations = config.get(
+            "max_generations",
+            self.DEFAULT_CONFIG["max_generations"],
+        )
+        self.seed = config.get("seed", self.DEFAULT_CONFIG["seed"])
+        self.target_fitness = config.get(
+            "target_fitness",
+            self.DEFAULT_CONFIG["target_fitness"],
+        )
+        monitoring_config = dict(self.DEFAULT_CONFIG["monitoring"])
+        monitoring_config.update(config.get("monitoring", {}))
         self.generation = 0
         self.generator = np.random.default_rng(self.seed)
         self.bounds = self.problem.bounds
         self.dim = self.problem.dim
         self.population = np.empty((self.popsize, self.dim))
         self.strategy_method, self.strategy_samples = self._get_strategy(self.strategy)
-        self.monitor = Monitor()
-        
+        self.monitor = Monitor(monitoring_config)
+
     def reset(self):
         super().reset()
         self.generation = 0
@@ -70,26 +79,39 @@ class DifferentialEvolution(Algorithm):
 
     def _get_strategy(self, name):
         if name not in self.STRATEGY_METHODS:
-            valid_strategies = ', '.join(self.STRATEGY_METHODS)
-            raise ValueError(f'Unknown strategy: {name}. Use one of: {valid_strategies}')
+            valid_strategies = ", ".join(self.STRATEGY_METHODS)
+            raise ValueError(
+                f"Unknown strategy: {name}. Use one of: {valid_strategies}"
+            )
 
         method_name, samples_count = self.STRATEGY_METHODS[name]
         return getattr(self, method_name), samples_count
-    
+
     def _stop(self):
-        return self.generation >= self.max_generations or self.best_fitness < 0.01
-    
+        return (
+            self.generation >= self.max_generations
+            or self.best_fitness < self.target_fitness
+        )
+
     def _generate_population(self):
-        self.population = self.generator.uniform(self.bounds[:, 0], self.bounds[:, 1], (self.popsize, self.dim))
-    
+        self.population = self.generator.uniform(
+            self.bounds[:, 0],
+            self.bounds[:, 1],
+            (self.popsize, self.dim),
+        )
+
     def _evaluate_population(self, population):
         return np.array([self.problem.evaluate(x) for x in population])
 
     def _mutate_rand_1(self, ids, best_idx):
-        return self.population[ids[:, 0]] + self.F1 * (self.population[ids[:, 1]] - self.population[ids[:, 2]])
+        return self.population[ids[:, 0]] + self.F1 * (
+            self.population[ids[:, 1]] - self.population[ids[:, 2]]
+        )
 
     def _mutate_best_1(self, ids, best_idx):
-        return self.population[best_idx] + self.F1 * (self.population[ids[:, 0]] - self.population[ids[:, 1]])
+        return self.population[best_idx] + self.F1 * (
+            self.population[ids[:, 0]] - self.population[ids[:, 1]]
+        )
 
     def _mutate_rand_2(self, ids, best_idx):
         return (
@@ -97,7 +119,7 @@ class DifferentialEvolution(Algorithm):
             + self.F1 * (self.population[ids[:, 1]] - self.population[ids[:, 2]])
             + self.F2 * (self.population[ids[:, 3]] - self.population[ids[:, 4]])
         )
-    
+
     def _mutate_best_2(self, ids, best_idx):
         return (
             self.population[best_idx]
@@ -111,7 +133,7 @@ class DifferentialEvolution(Algorithm):
             + self.F1 * (self.population[best_idx] - self.population)
             + self.F2 * (self.population[ids[:, 0]] - self.population[ids[:, 1]])
         )
-    
+
     def _mutate_current_to_rand_1(self, ids, best_idx):
         return (
             self.population
@@ -119,9 +141,12 @@ class DifferentialEvolution(Algorithm):
             + self.F2 * (self.population[ids[:, 1]] - self.population[ids[:, 2]])
         )
 
-
     def _mutate(self, fitness):
-        ids = self.generator.integers(0, self.popsize, size=(self.popsize, self.strategy_samples))
+        ids = self.generator.integers(
+            0,
+            self.popsize,
+            size=(self.popsize, self.strategy_samples),
+        )
         best_idx = np.argmin(fitness)
         return self.strategy_method(ids, best_idx)
 
@@ -146,9 +171,31 @@ class DifferentialEvolution(Algorithm):
 
     def run(self):
         self.reset()
+        self.monitor.emit(
+            Event(
+                MonitoringEvent.RUN_START,
+                {
+                    "seed": self.seed,
+                    "popsize": self.popsize,
+                    "max_generations": self.max_generations,
+                    "strategy": self.strategy,
+                },
+            )
+        )
         self._generate_population()
         fitness = self._evaluate_population(self.population)
         self._update_best(fitness)
+        self.monitor.emit(
+            Event(
+                MonitoringEvent.GENERATION_COMPLETED,
+                {
+                    "generation": self.generation,
+                    "fitness": fitness,
+                    "best_fitness": self.best_fitness,
+                    "evaluations_count": self.problem.evaluations_count,
+                },
+            )
+        )
 
         while not self._stop():
             self.generation += 1
@@ -158,6 +205,36 @@ class DifferentialEvolution(Algorithm):
             trial_fitness = self._evaluate_population(trials)
             fitness = self._select(trials, fitness, trial_fitness)
             self._update_best(fitness)
-        
-        return Result(self.best, self.best_fitness)
-    
+            self.monitor.emit(
+                Event(
+                    MonitoringEvent.GENERATION_COMPLETED,
+                    {
+                        "generation": self.generation,
+                        "fitness": fitness,
+                        "best_fitness": self.best_fitness,
+                        "evaluations_count": self.problem.evaluations_count,
+                    },
+                )
+            )
+
+        self.monitor.emit(
+            Event(
+                MonitoringEvent.RUN_END,
+                {
+                    "generation": self.generation,
+                    "best_fitness": self.best_fitness,
+                    "evaluations_count": self.problem.evaluations_count,
+                },
+            )
+        )
+        monitor_result = self.monitor.build_result_fields()
+
+        return DEResult(
+            best=self.best,
+            best_fitness=self.best_fitness,
+            generations=self.generation,
+            evaluations=self.problem.evaluations_count,
+            wall_ns=monitor_result["wall_ns"],
+            cpu_ns=monitor_result["cpu_ns"],
+            history=monitor_result["history"],
+        )

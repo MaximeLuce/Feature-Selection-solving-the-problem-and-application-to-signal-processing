@@ -13,6 +13,7 @@ from app.runners.ea_convergence import EAConvergence
 from app.runners.ea_parameters import EAParameters
 from app.runners.sa_parameters import SAParameters
 from app.runners.de_parameters import DEParameters
+from app.runners.de_parameters_parallel import DEParametersParallell
 
 if __name__ == "__main__":
     #runner = EAParameters()
@@ -20,5 +21,6 @@ if __name__ == "__main__":
     #runner = ComparisonRunner()
     #runner = BestRunnerSAEA()
     #runner = EAConvergence()
-    runner = DEParameters()
+    #runner = DEParameters()
+    runner = DEParametersParallell()
     runner.run_all()
