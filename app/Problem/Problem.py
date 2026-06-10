@@ -2,7 +2,7 @@ import numpy as np
 from sklearn.neighbors import KNeighborsClassifier
 from sklearn.model_selection import cross_val_score
 
-from app.Problem.DataLoader import * # use in the alternative constructor
+from app.Problem.DataLoader import DataLoader
 
 class Problem:
     """
@@ -27,10 +27,10 @@ class Problem:
         self.evaluations_count = 0
         
     @classmethod
-    def load_dataset(self, dataset_id, k=3):
+    def load_dataset(cls, dataset_id, k=3):
         """Alternative constructor to instanciate from dataset."""
         X, y, metadata = DataLoader.load_data(dataset_id)
-        return self(X, y, metadata, k)
+        return cls(X, y, metadata, k=k)
 
     def evaluate(self, feature_mask):
         """
@@ -59,11 +59,10 @@ class Problem:
         # we return the error (1 - accuracy) because using PFSP tools, we optimize by trying to get minimal value
         error = 1.0 - mean_accuracy
 
-        feature_ratio = num_selected / self.num_features
+        feature_ratio = len(selected_indices) / self.num_features
         
         # weightened fitness
-
         fitness = (self.alpha * error) + ((1.0 - self.alpha) * feature_ratio)
-        return error
+        return fitness
 
 

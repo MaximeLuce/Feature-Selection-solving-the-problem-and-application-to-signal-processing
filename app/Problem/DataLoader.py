@@ -1,9 +1,5 @@
 import numpy as np
 from ucimlrepo import fetch_ucirepo
-
-# Kaggle
-import kagglehub
-from kagglehub import KaggleDatasetAdapter
 import pandas as pd
 
 # to format dic as UCIrepo

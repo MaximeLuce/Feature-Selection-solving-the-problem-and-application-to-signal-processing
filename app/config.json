@@ -14,5 +14,35 @@
         {"id": "5", "initial_temp": 1000, "cooling_rate": 0.99},
         {"id": "6", "initial_temp": 1000, "cooling_rate": 0.999},
         {"id": "7", "initial_temp": 1000, "cooling_rate": 0.9999}
+    ],
+    "cases_DE_decoding": [
+        {
+            "id": "sigma_1",
+            "popsize": 50,
+            "max_generations": 10,
+            "seed": 42,
+            "strategy": "rand/1",
+            "F1": 0.5,
+            "F2": 0.5,
+            "CR": 0.7,
+            "decoder": {
+                "name": "sigma",
+                "threshold": 0.5,
+                "bounds": [-6.0, 6.0]
+            }
+        },
+        {
+            "id": "am_1",
+            "popsize": 50,
+            "max_generations": 10,
+            "seed": 42,
+            "strategy": "rand/1",
+            "F1": 0.5,
+            "F2": 0.5,
+            "CR": 0.7,
+            "decoder": {
+                "name": "am"
+            }
+        }
     ]
 }

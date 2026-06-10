@@ -7,16 +7,18 @@ import os
 #os.environ["NUMEXPR_NUM_THREADS"] = "1" # NumExpr
 
 
-from app.Utilities.ComparisonRunner import ComparisonRunner
-from app.Utilities.BestRunnerSAEA import BestRunnerSAEA
-from app.Utilities.SAParameters import SAParameters
-from app.Utilities.EAParameters import EAParameters
-from app.Utilities.EAConvergence import EAConvergence
+from app.runners.best_runner_sa_ea import BestRunnerSAEA
+from app.runners.comparison_runner import ComparisonRunner
+from app.runners.ea_convergence import EAConvergence
+from app.runners.ea_parameters import EAParameters
+from app.runners.sa_parameters import SAParameters
+from app.runners.de_parameters import DEParameters
 
 if __name__ == "__main__":
     #runner = EAParameters()
-    runner = SAParameters()
+    #runner = SAParameters()
     #runner = ComparisonRunner()
     #runner = BestRunnerSAEA()
     #runner = EAConvergence()
+    runner = DEParameters()
     runner.run_all()
