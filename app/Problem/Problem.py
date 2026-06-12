@@ -1,7 +1,7 @@
 # problem.py
 
 from app.Problem.DataLoader import DataLoader
-from app.Problem.Evaluator import Evaluator, KNNEvaluator, SVMEvaluator
+from app.Problem.Evaluator import Evaluator, KNNEvaluator, RFEvaluator, SVMEvaluator
 from app.Problem.Fitness import ErrorFitness, Fitness, WeightedErrorFitness
 from app.Utilities.ConfigLoader import load_config
 
@@ -47,9 +47,11 @@ class Problem:
     @staticmethod
     def _build_evaluator(evaluation_model, cv_folds):
         if evaluation_model == "svm":
-            return SVMEvaluator(cv_folds=cv_folds)
+            return SVMEvaluator(cv_folds=cv_folds, scoring="accuracy")
         if evaluation_model == "knn":
-            return KNNEvaluator(cv_folds=cv_folds)
+            return KNNEvaluator(cv_folds=cv_folds, scoring="accuracy")
+        if evaluation_model == "rf":
+            return RFEvaluator(cv_folds=cv_folds)
         raise ValueError(f"Unknown evaluation model: {evaluation_model}")
 
     @staticmethod
