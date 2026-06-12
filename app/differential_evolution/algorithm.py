@@ -142,11 +142,21 @@ class DifferentialEvolution(Algorithm):
         )
 
     def _mutate(self, fitness):
-        ids = self.generator.integers(
-            0,
-            self.popsize,
-            size=(self.popsize, self.strategy_samples),
-        )
+        if self.popsize <= self.strategy_samples:
+            raise ValueError(
+                f"Population size {self.popsize} is too small for strategy "
+                f"{self.strategy}; need more than {self.strategy_samples} individuals."
+            )
+        # pop x pop scores
+        scores = self.generator.random((self.popsize, self.popsize))
+        # guarantee uniqueness - diag to inf so the individual can't sample itself
+        scores[np.arange(self.popsize), np.arange(self.popsize)] = np.inf
+        # take k best samples
+        ids = np.argpartition(
+            scores,
+            self.strategy_samples - 1,
+            axis=1,
+        )[:, :self.strategy_samples]
         best_idx = np.argmin(fitness)
         return self.strategy_method(ids, best_idx)
 

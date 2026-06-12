@@ -124,6 +124,10 @@ def run_groups(grouped_configs, worker, aggregate_fn, write_fn, print_fn,
                max_workers=None, description="runs"):
     """Execute individual runs and write a row when a whole group completes."""
     worker_count = max_workers or (os.cpu_count() or 4)
+    grouped_configs = sorted(
+        grouped_configs,
+        key=lambda item: min(config["order"] for config in item[1]),
+    )
 
     # Resume: skip already-completed groups
     completed = set()
@@ -146,7 +150,7 @@ def run_groups(grouped_configs, worker, aggregate_fn, write_fn, print_fn,
     group_results = defaultdict(list)
     all_configs = []
     for group_key, configs in pending:
-        for config in configs:
+        for config in sorted(configs, key=lambda config: config["run_id"]):
             all_configs.append((group_key, config))
 
     with ProcessPoolExecutor(max_workers=worker_count) as executor:
