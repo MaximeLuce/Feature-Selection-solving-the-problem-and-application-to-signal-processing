@@ -89,3 +89,5 @@ venv.bak/
 # Temporary file for partial code execution
 tempCodeRunnerFile.py
 
+scalene-profile.json
+scalene-profile.html
