@@ -119,20 +119,10 @@ def run_parallel_configs(configurations, worker, max_workers=None):
     return results
 
 
-def _run_group_batch(group_batch, worker):
-    batch_results = []
-    for group_index, group_key, configs in group_batch:
-        group_results = []
-        for config in configs:
-            group_results.append(worker(config))
-        batch_results.append((group_index, group_key, group_results))
-    return batch_results
-
-
 def run_groups(grouped_configs, worker, aggregate_fn, write_fn, print_fn,
                resume_columns=None, csv_filepath=None,
                max_workers=None, description="runs"):
-    """Execute grouped configs with round-robin assignment."""
+    """Execute individual runs and write a row when a whole group completes."""
     worker_count = max_workers or (os.cpu_count() or 4)
 
     # Resume: skip already-completed groups
@@ -149,43 +139,33 @@ def run_groups(grouped_configs, worker, aggregate_fn, write_fn, print_fn,
         print("All groups already completed.")
         return
 
-    actual_workers = min(worker_count, len(pending))
-    worker_batches = [[] for _ in range(actual_workers)]
-    ordered_groups = []
-
-    for group_index, (group_key, configs) in enumerate(pending):
-        worker_batches[group_index % actual_workers].append(
-            (group_index, group_key, configs)
-        )
-        ordered_groups.append((group_index, group_key))
-
-    grouped_results = {}
+    expected_counts = {
+        group_key: len(configs)
+        for group_key, configs in pending
+    }
+    group_results = defaultdict(list)
+    all_configs = []
+    for group_key, configs in pending:
+        for config in configs:
+            all_configs.append((group_key, config))
 
     with ProcessPoolExecutor(max_workers=worker_count) as executor:
         futures = {
-            executor.submit(_run_group_batch, batch, worker): worker_index
-            for worker_index, batch in enumerate(worker_batches)
-            if batch
+            executor.submit(worker, config): group_key
+            for group_key, config in all_configs
         }
 
-        pbar = tqdm(total=len(pending), desc=description)
+        pbar = tqdm(total=len(all_configs), desc=description)
         for future in as_completed(futures):
-            batch_results = future.result()
-            pbar.update(len(batch_results))
-            for group_index, group_key, group_results in batch_results:
-                grouped_results[group_index] = (group_key, group_results)
+            group_key = futures[future]
+            group_results[group_key].append(future.result())
+            pbar.update(1)
+            if len(group_results[group_key]) == expected_counts[group_key]:
+                row = aggregate_fn(group_key, group_results[group_key])
+                write_fn([row])
+                print_fn(row)
 
         pbar.close()
-
-    rows = []
-    for group_index, group_key in ordered_groups:
-        _, group_results = grouped_results[group_index]
-        row = aggregate_fn(group_key, group_results)
-        rows.append(row)
-
-    write_fn(rows)
-    for row in rows:
-        print_fn(row)
 
 
 def run_grouped_configs(configurations, group_keys_fn, worker, aggregate_fn,

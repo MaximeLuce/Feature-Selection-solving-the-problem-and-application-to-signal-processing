@@ -6,10 +6,5 @@ from app.runners.ea_parameters import EAParameters
 from app.runners.sa_parameters import SAParameters
 
 __all__ = [
-    "BestRunnerSAEA",
-    "ComparisonRunner",
-    "DEParameters",
-    "EAConvergence",
-    "EAParameters",
-    "SAParameters",
+    "DEParameters"
 ]
