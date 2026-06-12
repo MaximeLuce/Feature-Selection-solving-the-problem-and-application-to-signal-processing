@@ -35,7 +35,7 @@ class Problem:
 
     def __str__(self):
         return (
-            f"Problem loaded: dataset with {self.num_features} "
+            f"Problem: dataset with {self.num_features} "
             f"features and {self.num_instances} instances."
             f" Evaluator: {self.evaluation_model}, "
             f"Fitness: {self.fitness_name}"
