@@ -52,7 +52,9 @@ def run_de_config(config):
     evaluation_config = dict(config["evaluation_config"])
     problem = Problem.load_dataset(dataset_id, evaluation_config)
 
-    decoder = build_decoder(config["decoder"])
+    decoder_config = dict(config["decoder"])
+    decoder_config["seed"] = config["seed"]
+    decoder = build_decoder(decoder_config)
     de_problem = FeatureSelectionProblem(problem, decoder)
 
     de_config = dict(config)
@@ -86,7 +88,7 @@ def run_de_config(config):
         "seed": config["seed"],
         "sample_index": config["sample_index"],
         "decoder_name": decoder.name,
-        "decoder_config": config["decoder"],
+        "decoder_config": decoder_config,
         "evaluation_model": evaluation_config["evaluation_model"],
         "fitness_name": evaluation_config["fitness"],
         "alpha": evaluation_config["alpha"],
@@ -106,11 +108,11 @@ class DEParameters:
         config = load_config()
         self.dataset_ids = config.get("dataset_ids", [0])
         self.runs_per_algo = config.get("runs_per_algo", 10)
-        self.cases = config.get("cases_DE_strategy", [])
+        self.cases = config.get("cases_DE_test", [])
         self.evaluation_cases = build_evaluation_cases(config)
         self.csv_filepath = config.get(
             "csv_filepath",
-            "app/Results/SAParameters/DEParameters_strategy.csv",
+            "app/Results/SAParameters/DEParameters_test2.csv",
         )
 
         if not self.cases:
@@ -182,6 +184,8 @@ class DEParameters:
                 config["decoder"]["name"],
                 config["evaluation_config"]["evaluation_model"],
                 config["evaluation_config"]["fitness"],
+                config["evaluation_config"]["alpha"],
+                config["evaluation_config"]["cv_folds"],
             ),
             worker=run_de_config,
             aggregate_fn=self._aggregate_group,
@@ -225,6 +229,8 @@ class DEParameters:
                 result["decoder_name"],
                 result["evaluation_model"],
                 result["fitness_name"],
+                result["alpha"],
+                result["cv_folds"],
             ),
             self._aggregate_group,
         )
@@ -234,4 +240,4 @@ class DEParameters:
 
 
 if __name__ == "__main__":
-    DEParameters().run_all()
+    DEParameters().run_all_grouped()
