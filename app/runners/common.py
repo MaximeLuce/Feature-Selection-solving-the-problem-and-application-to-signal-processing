@@ -184,6 +184,7 @@ def run_parallel_configs(configurations, worker, max_workers=None, description="
 def run_groups(grouped_configs, worker, aggregate_fn, write_fn, print_fn,
                resume_columns=None, csv_filepath=None,
                max_workers=None, description="runs"):
+    """Execute individual runs and write a row when a whole group completes."""
     worker_count = max_workers or (os.cpu_count() or 4)
     grouped_configs = sorted(
         grouped_configs,

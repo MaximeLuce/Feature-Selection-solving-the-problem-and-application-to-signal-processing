@@ -9,8 +9,8 @@ def build_decoder(config: dict):
     name = config.get("name")
     if name == "sigma":
         return SigmaDecoder(
-            threshold=config.get("threshold", 0.5),
             bounds=config.get("bounds"),
+            seed=config.get("seed"),
         )
     if name == "am":
         return AMDecoder(bounds=config.get("bounds"))

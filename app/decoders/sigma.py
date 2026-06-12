@@ -2,15 +2,14 @@ import numpy as np
 
 
 class SigmaDecoder:
-    def __init__(self, threshold: float = 0.5, bounds=None):
+    def __init__(self, bounds=None, seed=None):
         self.value_bounds = np.asarray(bounds or [-6.0, 6.0], dtype=float)
-        self.name = 'sigma'
+        self.name = "sigma"
+        self.generator = np.random.default_rng(seed)
 
         if self.value_bounds.shape != (2,):
             raise ValueError("Sigma decoder bounds must be a pair: [low, high].")
         self.value_bounds = np.clip(self.value_bounds, -500, 500)
-
-        self.cutoff = -np.log(1.0 / threshold - 1.0)
 
     def bounds(self, num_features: int) -> np.ndarray:
         return np.tile(self.value_bounds, (num_features, 1))
@@ -21,4 +20,5 @@ class SigmaDecoder:
             raise ValueError(
                 f"Sigma decoder expected {num_features} values, got {values.size}."
             )
-        return (values >= self.cutoff).astype(int)
+        probabilities = 1.0 / (1.0 + np.exp(-values))
+        return (self.generator.random(num_features) < probabilities).astype(int)
