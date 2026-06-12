@@ -8,6 +8,11 @@ class Evaluator:
     name = "evaluator"
     
     def evaluate(self, X_subset, y_values) -> float:
+        """Cross-validated accuracy on training data."""
+        raise NotImplementedError
+
+    def evaluate_final(self, X_train, y_train, X_test, y_test) -> float:
+        """Fit on train, score on test."""
         raise NotImplementedError
 
 class SVMEvaluator(Evaluator):
@@ -36,14 +41,24 @@ class SVMEvaluator(Evaluator):
         )
         return float(scores.mean())
 
+    def evaluate_final(self, X_train, y_train, X_test, y_test):
+        model = make_pipeline(StandardScaler(), SVC(kernel="rbf", gamma="scale"))
+        model.fit(X_train, y_train)
+        return float(model.score(X_test, y_test))
+
 
 class KNNEvaluator(Evaluator):
     name = "knn"
 
     def __init__(self, cv_folds=5, scoring="accuracy", n_neighbors=3):
         self.cv_folds = cv_folds
+        self.n_neighbors = n_neighbors
         self.model = KNeighborsClassifier(n_neighbors)
-        self.cv_strategy = cv_folds
+        self.cv_strategy = StratifiedKFold(
+            n_splits=cv_folds,
+            shuffle=True,
+            random_state=42,
+        )
         self.scoring = scoring
 
     def evaluate(self, X_subset, y_values):
@@ -56,3 +71,7 @@ class KNNEvaluator(Evaluator):
         )
         return float(scores.mean())
 
+    def evaluate_final(self, X_train, y_train, X_test, y_test):
+        model = KNeighborsClassifier(self.n_neighbors)
+        model.fit(X_train, y_train)
+        return float(model.score(X_test, y_test))

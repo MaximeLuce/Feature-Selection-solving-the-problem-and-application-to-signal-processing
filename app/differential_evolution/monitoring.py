@@ -60,7 +60,7 @@ class Monitor:
                 self.wall_start_ns = time.perf_counter_ns()
                 self.wall_ns = None
             if MonitoringMetric.CPU_TIME_NS in self.metrics:
-                self.cpu_start_ns = time.process_time_ns()
+                self.cpu_start_ns = time.thread_time_ns()
                 self.cpu_ns = None
             return
 
@@ -90,7 +90,7 @@ class Monitor:
             if MonitoringMetric.ELAPSED_TIME_NS in self.metrics and self.wall_start_ns is not None:
                 self.wall_ns = time.perf_counter_ns() - self.wall_start_ns
             if MonitoringMetric.CPU_TIME_NS in self.metrics and self.cpu_start_ns is not None:
-                self.cpu_ns = time.process_time_ns() - self.cpu_start_ns
+                self.cpu_ns = time.thread_time_ns() - self.cpu_start_ns
             if not self.run_end_metrics:
                 return
             record : dict[str, Any] = {

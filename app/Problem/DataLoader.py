@@ -1,25 +1,32 @@
-import numpy as np
 from ucimlrepo import fetch_ucirepo
 import pandas as pd
+from sklearn.model_selection import train_test_split
 
 # to format dic as UCIrepo
 from types import SimpleNamespace
 
+
 class DataLoader:
+    _cache = {}
+
     """
     Utilitary to read and extract the data from the dataset
     Input: a specific ID for each UCI dataset (and 0 for local kaggle dataset)
-    Output: - X ; all the features
-            - y ; the cible
+    Output: - X_train, X_test ; train/test split of features
+            - y_train, y_test ; train/test split of target
             - metadata ; information on the dataset
     """
-    
+
     @staticmethod
-    def load_data(dataset_id):
+    def load_data(dataset_id, test_size=0.2, random_state=42):
         """
-        Get the dataset with id = dataset_id from UCI and split features (X) from cible (y).
+        Load dataset and split into train/test.
         If id=0, we use the local kaggle data set.
         """
+        cache_key = (dataset_id, test_size, random_state)
+        if cache_key in DataLoader._cache:
+            return DataLoader._cache[cache_key]
+
         print(f"Dataset ID={dataset_id} loading...")
         if dataset_id == 0:
             print("Loading local kaggle dataset...")
@@ -43,21 +50,25 @@ class DataLoader:
                 "file_path": file_path,
                 "shape": df.shape,
                 "features_count": X.shape[1],
-				"num_instances": df.shape[0]
+                "num_instances": df.shape[0],
             }
             metadata = SimpleNamespace(**metadata_dict) # formatting the dict into UCI object like
-            # countingprint(df['object_class'].value_counts())
 
-            return X, y, metadata
-            
         else:
             dataset = fetch_ucirepo(id=dataset_id) 
             
             X = dataset.data.features 
             y = dataset.data.targets 
             metadata = dataset.metadata
-            
-            return X, y, metadata
+
+        X_train, X_test, y_train, y_test = train_test_split(
+            X, y, test_size=test_size, random_state=random_state, stratify=y
+        )
+        metadata.num_instances = len(X_train)
+
+        loaded_data = (X_train, X_test, y_train, y_test, metadata)
+        DataLoader._cache[cache_key] = loaded_data
+        return loaded_data
     
 # TEST
 '''

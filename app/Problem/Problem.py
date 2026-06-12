@@ -11,11 +11,19 @@ class Problem:
     Represents the Feature Selection problem and contain the fitness function
     """
 
-    def __init__(self, X, y, metadata, evaluator, fitness):
-        self.X = X
-        self.y = y
+    def __init__(self, X_train, y_train, X_test, y_test, metadata, evaluator, fitness):
+        # Training data
+        self.X = X_train
+        self.y = y_train
+        self.y_values = y_train.values.ravel()
+
+        # Test data
+        self.X_test = X_test
+        self.y_test = y_test
+        self.y_test_values = y_test.values.ravel()
+
         self.metadata = metadata
-        self.num_features = X.shape[1]
+        self.num_features = X_train.shape[1]
         self.num_instances = metadata.num_instances
         self.evaluator: Evaluator = evaluator
         self.fitness: Fitness = fitness
@@ -23,7 +31,6 @@ class Problem:
         self.fitness_name = fitness.name
         self.alpha = getattr(fitness, "alpha", None)
         self.cv_folds = getattr(evaluator, "cv_folds", None)
-        self.y_values = self.y.values.ravel()
         self.evaluations_count = 0
 
     def __str__(self):
@@ -37,36 +44,63 @@ class Problem:
     def reset_counter(self):
         self.evaluations_count = 0
 
+    @staticmethod
+    def _build_evaluator(evaluation_model, cv_folds):
+        if evaluation_model == "svm":
+            return SVMEvaluator(cv_folds=cv_folds)
+        if evaluation_model == "knn":
+            return KNNEvaluator(cv_folds=cv_folds)
+        raise ValueError(f"Unknown evaluation model: {evaluation_model}")
+
+    @staticmethod
+    def _build_fitness(fitness_name, alpha):
+        if fitness_name == "error":
+            return ErrorFitness()
+        if fitness_name == "weighted_error":
+            return WeightedErrorFitness(alpha)
+        raise ValueError(f"Unknown fitness: {fitness_name}")
+
     @classmethod
-    def load_dataset(cls, dataset_id, evaluation_config=None):
+    def from_dataset(
+        cls,
+        X_train,
+        X_test,
+        y_train,
+        y_test,
+        metadata,
+        evaluation_config=None,
+    ):
         config = load_config()
         evaluation_config = evaluation_config or {}
         evaluation_model = evaluation_config.get(
             "evaluation_model",
             config.get("evaluation_model", "svm"),
         )
+        cv_folds = evaluation_config.get(
+            "cv_folds",
+            config.get("cv_folds", 5),
+        )
         fitness_name = evaluation_config.get(
             "fitness",
             config.get("fitness", "weighted_error"),
         )
+        alpha = evaluation_config.get("alpha", config.get("alpha", 0.5))
 
-        X, y, metadata = DataLoader.load_data(dataset_id)
-        if evaluation_model == "svm":
-            evaluator = SVMEvaluator()
-        elif evaluation_model == "knn":
-            evaluator = KNNEvaluator()
-        else:
-            raise ValueError(f"Unknown evaluation model: {evaluation_model}")
+        evaluator = cls._build_evaluator(evaluation_model, cv_folds)
+        fitness = cls._build_fitness(fitness_name, alpha)
 
-        if fitness_name == "error":
-            fitness = ErrorFitness()
-        elif fitness_name == "weighted_error":
-            alpha = evaluation_config.get("alpha", config.get("alpha", 0.5))
-            fitness = WeightedErrorFitness(alpha)
-        else:
-            raise ValueError(f"Unknown fitness: {fitness_name}")
+        return cls(X_train, y_train, X_test, y_test, metadata, evaluator, fitness)
 
-        return cls(X, y, metadata, evaluator, fitness)
+    @classmethod
+    def load_dataset(cls, dataset_id, evaluation_config=None):
+        config = load_config()
+        evaluation_config = evaluation_config or {}
+        seed = evaluation_config.get(
+            "seed",
+            config.get("seed", 42),
+        )
+        loaded_data = DataLoader.load_data(dataset_id, random_state=seed)
+        return cls.from_dataset(*loaded_data, evaluation_config=evaluation_config)
 
     def evaluate(self, feature_mask):
         """
@@ -85,3 +119,18 @@ class Problem:
         error = 1.0 - accuracy
         feature_ratio = len(selected_indices) / self.num_features
         return self.fitness.compute(error, feature_ratio)
+
+    def evaluate_final(self, feature_mask):
+        """Fit model on train data, score on test data (used after optimization)."""
+        selected_indices = [i for i, bit in enumerate(feature_mask) if bit == 1]
+        if len(selected_indices) == 0:
+            return 0.0
+
+        X_train_sub = self.X.iloc[:, selected_indices]
+        X_test_sub = self.X_test.iloc[:, selected_indices]
+        return self.evaluator.evaluate_final(
+            X_train_sub,
+            self.y_values,
+            X_test_sub,
+            self.y_test_values,
+        )
