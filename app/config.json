@@ -33,7 +33,7 @@
         {
             "id": "1",
             "popsize": 50,
-            "max_generations": 200,
+            "max_generations": 1,
             "seed": 42,
             "strategy": "rand/1",
             "F1": 0.5,

@@ -1,4 +1,13 @@
-# app/runners/de_parameters2.py
+import os
+
+for env_var in (
+    "OMP_NUM_THREADS",
+    "OPENBLAS_NUM_THREADS",
+    "MKL_NUM_THREADS",
+    "VECLIB_MAXIMUM_THREADS",
+    "NUMEXPR_NUM_THREADS",
+):
+    os.environ.setdefault(env_var, "1")
 
 import numpy as np
 
@@ -16,16 +25,37 @@ from app.runners.common import (
 TIMING_METRICS = ["elapsed_time_ns", "cpu_time_ns"]
 
 def run_de_config(config):
+    print(
+        "Run starting: "
+        f"pid={os.getpid()} "
+        f"case={config['case_id']} "
+        f"dataset={config['dataset_id']} "
+        f"evaluator={config['evaluation_model']} "
+        f"sample={config.get('sample_id', '?')} "
+        f"strategy={config['strategy']} "
+        f"popsize={config['popsize']} "
+        f"generations={config['max_generations']}",
+        flush=True,
+    )
     dataset_id = config["dataset_id"]
     evaluation_config = dict(config["evaluation_config"])
     problem = Problem.load_dataset(dataset_id, evaluation_config)
 
-    decoder_config = config["decoder"]
+    decoder_config = dict(config["decoder"])
     decoder_config["seed"] = config["seed"]
     decoder = build_decoder(decoder_config)
     de_problem = FeatureSelectionProblem(problem, decoder)
 
-    de = DifferentialEvolution(de_problem, config)
+    de_config = dict(config)
+    monitoring = dict(de_config.get("monitoring", {}))
+    monitoring_metrics = list(monitoring.get("metrics", []))
+    for metric in TIMING_METRICS:
+        if metric not in monitoring_metrics:
+            monitoring_metrics.append(metric)
+    monitoring["metrics"] = monitoring_metrics
+    de_config["monitoring"] = monitoring
+
+    de = DifferentialEvolution(de_problem, de_config)
     result = de.run()
 
     if result.wall_ns is None:
@@ -41,6 +71,7 @@ def run_de_config(config):
         "case_id": config["case_id"],
         "dataset_id": dataset_id,
         "popsize": config["popsize"],
+        "strategy": config["strategy"],
         "max_generations": config["max_generations"],
         "base_seed": config["base_seed"],
         "seed": config["seed"],
@@ -64,15 +95,20 @@ class DEParameters:
         self.config = load_config()
         self.dataset_ids = self.config.get("dataset_ids", [0])
         self.runs_per_algo = self.config.get("runs_per_algo", 10)
+        self.max_workers = self.config.get(
+            "de_max_workers",
+            max(1, min(4, os.cpu_count() or 4)),
+        )
         self.cases = self.config.get("cases_DE_strategy", [])
-        self.evaluation_cases = self.config.get("evaluation_cases", {
-            "evaluation_model": "svm", 
-            "fitness": "weighted_error", 
-            "alpha": 0.5, 
-            "cv_folds": 5})
+        self.evaluation_cases = self.config.get("evaluation_cases", [{
+            "evaluation_model": "svm",
+            "fitness": "weighted_error",
+            "alpha": 0.5,
+            "cv_folds": 5,
+        }])
     
         self.configurations = list(build_run_configs(self.dataset_ids, self.cases, self.evaluation_cases, self.runs_per_algo))
-        self.csv_filepath = "app/Results/SAParameters/DEParameters_test.csv"
+        self.csv_filepath = "app/Results/SAParameters/DEParameters4_test.csv"
     
     def run_all(self):
         run_parallel_configs(
@@ -81,6 +117,7 @@ class DEParameters:
                 "case_id", "dataset_id", "popsize", "max_generations",
                 "decoder_name", "evaluation_model", "fitness_name", "alpha", "cv_folds",
             ],
+            max_workers=self.max_workers,
         )
 
     def run_profile_config(
