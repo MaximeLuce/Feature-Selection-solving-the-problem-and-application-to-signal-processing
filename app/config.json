@@ -254,7 +254,7 @@
             }
         },
         {
-            "id": "28",
+            "id": "999",
             "popsize": 200,
             "max_generations": 50,
             "seed": 42,
@@ -267,7 +267,7 @@
             }
         },
         {
-            "id": "29",
+            "id": "28",
             "popsize": 100,
             "max_generations": 100,
             "seed": 42,
@@ -280,7 +280,7 @@
             }
         },
         {
-            "id": "30",
+            "id": "29",
             "popsize": 20,
             "max_generations": 500,
             "seed": 42,
@@ -291,9 +291,8 @@
             "decoder": {
                 "name": "am"
             }
-        }
-    ],
-    "cases_AMDE_case30": [
+        },
+    
         {
             "id": "30",
             "popsize": 10,
