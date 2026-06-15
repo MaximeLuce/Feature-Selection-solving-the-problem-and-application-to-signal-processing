@@ -43,8 +43,8 @@ class DataLoader:
 
             # removing Debris to transform the dataset into binar dataset
             df = df[df.iloc[:, -1] != 'Debris']
-			# extract the features X and the cible y
-            X = df.iloc[:, :-1] # all lines, all columns except the last one
+            # extract only freq_ features
+            X = df.filter(like="freq_")
             y = df.iloc[:, -1] # all lines, just the last column
             
             # metadata using the UCI format

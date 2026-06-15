@@ -1,10 +1,41 @@
+# app/runners/common.py
+
 import csv
+import json
 import os
-from collections import defaultdict
+from collections import OrderedDict
 from concurrent.futures import ProcessPoolExecutor, as_completed
 
-import pandas as pd
+import filelock
 from tqdm import tqdm
+
+
+def build_run_configs(dataset_ids, cases, evaluation_cases, runs_per_algo):
+    run_id = 0
+    group_id = 0
+    for dataset_id in dataset_ids:
+        for case in cases:
+            for evaluation_case in evaluation_cases:
+                base_seed = case["seed"]
+                for i in range(runs_per_algo):
+                    config = dict(case)
+                    config["dataset_id"] = dataset_id
+                    config["seed"] = base_seed ^ (i * 10000001)
+                    config["base_seed"] = base_seed
+                    config["case_id"] = case["id"]
+                    config["evaluation_config"] = dict(evaluation_case)
+                    config["evaluation_model"] = evaluation_case["evaluation_model"]
+                    config["fitness_name"] = evaluation_case.get("fitness", "")
+                    config["alpha"] = evaluation_case.get("alpha", "")
+                    config["cv_folds"] = evaluation_case.get("cv_folds", "")
+                    decoder_conf = case.get("decoder")
+                    config["decoder_name"] = decoder_conf["name"] if decoder_conf else ""
+                    config["run_id"] = run_id
+                    config["sample_id"] = i
+                    config["group_id"] = group_id
+                    run_id += 1
+                    yield config
+                group_id += 1
 
 
 def build_row_from_schema(values, schema):
@@ -24,7 +55,22 @@ def validate_and_order_row(row, columns):
     return {column: row[column] for column in columns}
 
 
+def ensure_csv_header(csv_filepath, columns):
+    if not os.path.isfile(csv_filepath):
+        return
+
+    with open(csv_filepath, mode="r", newline="") as file:
+        reader = csv.reader(file, delimiter=";")
+        existing_header = next(reader, None)
+    if existing_header != columns:
+        raise ValueError(
+            f"CSV header mismatch for {csv_filepath}. "
+            "Use a new output file or align the schema."
+        )
+
+
 def append_csv_rows(csv_filepath, columns, rows):
+    ensure_csv_header(csv_filepath, columns)
     file_exists = os.path.isfile(csv_filepath)
     with open(csv_filepath, mode="a", newline="") as file:
         writer = csv.DictWriter(file, fieldnames=columns, delimiter=";")
@@ -35,295 +81,232 @@ def append_csv_rows(csv_filepath, columns, rows):
         for row in rows:
             writer.writerow(validate_and_order_row(row, columns))
             file.flush()
-            tqdm.write(f"Row saved: case={row['Case_ID']} dataset={row['Dataset_ID']}")
+            tqdm.write(
+                f"Row saved: case={row['Case_ID']} dataset={row['Dataset_ID']} "
+                f"evaluator={row['Evaluator']}"
+            )
 
 
-def build_evaluation_cases(config):
-    cases = config.get("evaluation_cases")
-    if cases:
-        return cases
-    return [
-        {
-            "evaluation_model": config.get("evaluation_model", "svm"),
-            "fitness": config.get("fitness", "weighted_error"),
-            "alpha": config.get("alpha", 0.5),
-            "cv_folds": config.get("cv_folds", 5),
-        }
-    ]
+def save_raw_run_result(raw_dir, result_dict, filename):
+    os.makedirs(raw_dir, exist_ok=True)
+    filepath = os.path.join(raw_dir, filename)
+    lock = filelock.FileLock(filepath + ".lock")
+    with lock:
+        with open(filepath, "a", encoding="utf-8") as file:
+            file.write(json.dumps(result_dict) + "\n")
 
 
-def build_run_configs(dataset_ids, cases, evaluation_cases, runs_per_algo, build_case_config):
-    run_id = 0
-    order = 0
-    for dataset_id in dataset_ids:
-        for case in cases:
-            for evaluation_case in evaluation_cases:
-                base_seed = case["seed"]
-                for i in range(runs_per_algo):
-                    config = build_case_config(case)
-                    config["seed"] = base_seed ^ (i * 10000001)
-                    config["base_seed"] = base_seed
-                    config["sample_index"] = i + 1
-                    config["dataset_id"] = dataset_id
-                    config["case_id"] = case["id"]
-                    config["evaluation_config"] = dict(evaluation_case)
-                    config["order"] = order
-                    config["run_id"] = run_id
-                    run_id += 1
-                    yield config
-                order += 1
+def schema_column_by_key(csv_schema):
+    return {item["key"]: item["column"] for item in csv_schema}
 
 
-def build_groups(configurations, group_keys_fn):
-    """Group configs by group_keys_fn, return list of (group_key, [configs])."""
-    groups = defaultdict(list)
-    for config in configurations:
-        groups[group_keys_fn(config)].append(config)
-    return list(groups.items())
+def normalize_group_key(values):
+    return tuple(str(value) for value in values)
 
 
-def aggregate_grouped_results(results, group_keys_fn, aggregate_fn):
-    return [
-        aggregate_fn(group_key, group)
-        for group_key, group in build_groups(results, group_keys_fn)
-    ]
-
-
-def completed_group_keys(csv_filepath, key_columns):
-    """Read existing CSV and return set of completed groups."""
+def completed_group_keys(csv_filepath, key_columns, csv_schema):
     completed = set()
     if not os.path.isfile(csv_filepath):
         return completed
 
+    key_to_column = schema_column_by_key(csv_schema)
     with open(csv_filepath, mode="r", newline="") as file:
         reader = csv.DictReader(file, delimiter=";")
         for row in reader:
-            key = tuple(row.get(col, "") for col in key_columns)
+            key = normalize_group_key(
+                row.get(key_to_column[column], "")
+                for column in key_columns
+            )
             completed.add(key)
     return completed
 
 
-def format_run_label(data):
-    evaluation_model = data.get("evaluation_model")
-    if evaluation_model is None and "evaluation_config" in data:
-        evaluation_model = data["evaluation_config"]["evaluation_model"]
+def summarize_results_group(group_results, group_fields):
+    if not group_results:
+        raise ValueError("Cannot summarize an empty group.")
 
-    fitness_name = data.get("fitness_name")
-    if fitness_name is None and "evaluation_config" in data:
-        fitness_name = data["evaluation_config"]["fitness"]
+    first = group_results[0]
+    champion = min(group_results, key=lambda result: float(result["best_fitness"]))
+    final_scores = [float(result["final_score"]) for result in group_results]
+    wall_times = [float(result["elapsed_wall_s"]) for result in group_results]
+    cpu_times = [float(result["elapsed_cpu_s"]) for result in group_results]
+    evaluations = [float(result["evaluations_count"]) for result in group_results]
+    feature_counts = [float(result["nb_features_keep"]) for result in group_results]
 
-    decoder_name = data.get("decoder_name")
-    if decoder_name is None and "decoder" in data:
-        decoder_name = data["decoder"]["name"]
+    score_avg = sum(final_scores) / len(final_scores)
+    score_std = 0.0
+    if len(final_scores) > 1:
+        variance = sum((score - score_avg) ** 2 for score in final_scores) / (len(final_scores) - 1)
+        score_std = variance ** 0.5
 
-    label = (
-        f"case={data['case_id']} dataset={data['dataset_id']} "
-        f"evaluator={evaluation_model}"
-    )
-    if decoder_name is not None:
-        label += f" decoder={decoder_name}"
-    if fitness_name is not None:
-        label += f" fitness={fitness_name}"
-    if "sample_index" in data:
-        label += f" sample={data['sample_index']}"
-    return label
-
-
-def format_group_key(group_key):
-    if isinstance(group_key, tuple):
-        if len(group_key) == 7:
-            case_id, dataset_id, decoder, evaluator, fitness, alpha, cv_folds = group_key
-            return (
-                f"case={case_id} dataset={dataset_id} decoder={decoder} "
-                f"evaluator={evaluator} fitness={fitness} alpha={alpha} cv={cv_folds}"
-            )
-        if len(group_key) == 6:
-            case_id, dataset_id, evaluator, fitness, alpha, cv_folds = group_key
-            return (
-                f"case={case_id} dataset={dataset_id} "
-                f"evaluator={evaluator} fitness={fitness} alpha={alpha} cv={cv_folds}"
-            )
-    return str(group_key)
-
-
-def format_run_completed(result):
-    return (
-        f"Run completed: {format_run_label(result)} "
-        f"best={result['best_fitness']:.4f} "
-        f"score={result['final_score']:.2f} "
-        f"nfe={result['evaluations_count']}"
-    )
-
-
-def run_parallel_configs(configurations, worker, max_workers=None, description="runs"):
-    """Run all configurations in parallel."""
-    worker_count = max_workers or (os.cpu_count() or 4)
-    results = []
-
-    with ProcessPoolExecutor(max_workers=worker_count) as executor:
-        for config in configurations:
-            tqdm.write(f"Run started: {format_run_label(config)}")
-        futures = {
-            executor.submit(worker, config): config["run_id"]
-            for config in configurations
-        }
-
-        for future in tqdm(
-            as_completed(futures),
-            total=len(futures),
-            desc=description,
-            unit="run",
-        ):
-            result = future.result()
-            results.append(result)
-            tqdm.write(format_run_completed(result))
-
-    return results
-
-
-def run_groups(grouped_configs, worker, aggregate_fn, write_fn, print_fn,
-               resume_columns=None, csv_filepath=None,
-               max_workers=None, description="runs"):
-    """Execute individual runs and write a row when a whole group completes."""
-    worker_count = max_workers or (os.cpu_count() or 4)
-    grouped_configs = sorted(
-        grouped_configs,
-        key=lambda item: min(config["order"] for config in item[1]),
-    )
-
-    completed = set()
-    if csv_filepath and resume_columns:
-        completed = completed_group_keys(csv_filepath, resume_columns)
-        skipped = sum(1 for group_key, _ in grouped_configs if group_key in completed)
-        if skipped:
-            tqdm.write(f"Resuming: skipping {skipped} already-completed groups.")
-
-    pending = [
-        (group_key, configs)
-        for group_key, configs in grouped_configs
-        if group_key not in completed
-    ]
-    if not pending:
-        tqdm.write("All groups already completed.")
-        return
-
-    expected_counts = {
-        group_key: len(configs)
-        for group_key, configs in pending
+    summary = {
+        field: first[field]
+        for field in group_fields
+        if field in first
     }
-    group_results = defaultdict(list)
-    all_configs = []
-    for group_key, configs in pending:
-        for config in sorted(configs, key=lambda config: config["run_id"]):
-            all_configs.append((group_key, config))
-
-    with ProcessPoolExecutor(max_workers=worker_count) as executor:
-        for _, config in all_configs:
-            tqdm.write(f"Run started: {format_run_label(config)}")
-        futures = {
-            executor.submit(worker, config): group_key
-            for group_key, config in all_configs
+    summary.update(
+        {
+            "base_seed": first["base_seed"],
+            "score_best": max(final_scores),
+            "score_worst": min(final_scores),
+            "score_avg": score_avg,
+            "score_std": score_std,
+            "wall_avg_s": sum(wall_times) / len(wall_times),
+            "cpu_avg_s": sum(cpu_times) / len(cpu_times),
+            "nfe_avg": sum(evaluations) / len(evaluations),
+            "champion_score": float(champion["final_score"]),
+            "champion_features": int(champion["nb_features_keep"]),
+            "nb_features_keep": sum(feature_counts) / len(feature_counts),
         }
+    )
+    return summary
 
-        pbar = tqdm(total=len(all_configs), desc=description, unit="run")
+
+def _group_configurations(configurations):
+    grouped = OrderedDict()
+    for config in configurations:
+        grouped.setdefault(config["group_id"], []).append(config)
+    return list(grouped.items())
+
+
+def _pending_groups(configurations, resume_fields, csv_schema, csv_filepath):
+    grouped = _group_configurations(configurations)
+    completed = completed_group_keys(csv_filepath, resume_fields, csv_schema)
+    pending = []
+    for group_id, configs in grouped:
+        first = configs[0]
+        key = normalize_group_key(first.get(field, "") for field in resume_fields)
+        if key not in completed:
+            pending.append((group_id, configs))
+    return pending
+
+
+def run_parallel_configs(
+    configurations,
+    worker,
+    csv_filepath,
+    csv_schema,
+    group_fields,
+    resume_fields=None,
+    max_workers=None,
+):
+    resume_fields = resume_fields or group_fields
+    columns = [item["column"] for item in csv_schema]
+    ensure_csv_header(csv_filepath, columns)
+
+    pending_groups = _pending_groups(configurations, resume_fields, csv_schema, csv_filepath)
+    pending_configs = [config for _, group in pending_groups for config in group]
+    results = {group_id: [] for group_id, _ in pending_groups}
+    expected_counts = {group_id: len(group) for group_id, group in pending_groups}
+
+    worker_count = max_workers or (os.cpu_count() or 4)
+    if pending_configs:
+        tqdm.write(f"Submitting {len(pending_configs)} runs across {worker_count} workers.")
+    else:
+        tqdm.write("No pending runs to execute.")
+
+    pbar = tqdm(total=len(pending_configs), desc="completed runs", unit="run")
+    executor = ProcessPoolExecutor(max_workers=worker_count)
+    futures = {}
+    try:
+        futures = {executor.submit(worker, config): config for config in pending_configs}
         for future in as_completed(futures):
-            group_key = futures[future]
-            result = future.result()
-            group_results[group_key].append(result)
-            pbar.update(1)
-            tqdm.write(format_run_completed(result))
+            config = futures[future]
+            group_id = config["group_id"]
+            try:
+                result = future.result()
+            except Exception as exc:
+                raise RuntimeError(
+                    f"Worker failed for case={config['case_id']} "
+                    f"dataset={config['dataset_id']} "
+                    f"evaluator={config['evaluation_model']}"
+                ) from exc
 
-            done = len(group_results[group_key])
-            needed = expected_counts[group_key]
+            results[group_id].append(result)
+            pbar.update(1)
             tqdm.write(
-                f"Group progress: {format_group_key(group_key)} sample {done}/{needed}"
+                "Run finished: "
+                f"case={config['case_id']} "
+                f"dataset={config['dataset_id']} "
+                f"evaluator={config['evaluation_model']} "
+                f"sample={config.get('sample_id', '?')}"
             )
 
-            if done == needed:
-                tqdm.write(
-                    f"Aggregating row: {format_group_key(group_key)} samples={needed}"
-                )
-                row = aggregate_fn(group_key, group_results[group_key])
-                write_fn([row])
-                print_fn(row)
-
+            if len(results[group_id]) == expected_counts[group_id]:
+                try:
+                    values = summarize_results_group(results.pop(group_id), group_fields)
+                    row = build_row_from_schema(values, csv_schema)
+                    append_csv_rows(csv_filepath, columns, [row])
+                except Exception as exc:
+                    raise RuntimeError(
+                        f"Failed to summarize/save case={config['case_id']} "
+                        f"dataset={config['dataset_id']} "
+                        f"evaluator={config['evaluation_model']}"
+                    ) from exc
+    except Exception:
+        for future in futures:
+            future.cancel()
+        executor.shutdown(wait=False, cancel_futures=True)
+        raise
+    else:
+        executor.shutdown(wait=True, cancel_futures=False)
+    finally:
         pbar.close()
 
 
-def run_grouped_configs(configurations, group_keys_fn, worker, aggregate_fn,
-                        write_fn, print_fn, resume_columns=None,
-                        csv_filepath=None, max_workers=None,
-                        description="runs"):
-    grouped_configs = build_groups(configurations, group_keys_fn)
-    if not grouped_configs:
-        return
+def run_sequential_configs(
+    configurations,
+    worker,
+    csv_filepath,
+    csv_schema,
+    group_fields,
+    resume_fields=None,
+):
+    resume_fields = resume_fields or group_fields
+    columns = [item["column"] for item in csv_schema]
+    ensure_csv_header(csv_filepath, columns)
 
-    run_groups(
-        grouped_configs=grouped_configs,
-        worker=worker,
-        aggregate_fn=aggregate_fn,
-        write_fn=write_fn,
-        print_fn=print_fn,
-        resume_columns=resume_columns,
-        csv_filepath=csv_filepath,
-        max_workers=max_workers,
-        description=description,
-    )
+    pending_groups = _pending_groups(configurations, resume_fields, csv_schema, csv_filepath)
+    pending_configs = [config for _, group in pending_groups for config in group]
+    results = {group_id: [] for group_id, _ in pending_groups}
+    expected_counts = {group_id: len(group) for group_id, group in pending_groups}
 
+    if pending_configs:
+        tqdm.write(f"Running {len(pending_configs)} runs sequentially.")
+    else:
+        tqdm.write("No pending runs to execute.")
 
-def aggregate_feature_selection_group(group):
-    first = group[0]
-    dataset_id = int(first["dataset_id"])
-    group_df = pd.DataFrame(group)
-    score_df = group_df["final_score"].astype(float)
-    champion = group_df.loc[group_df["best_fitness"].astype(float).idxmin()]
+    pbar = tqdm(total=len(pending_configs), desc="completed runs", unit="run")
+    for config in pending_configs:
+        group_id = config["group_id"]
+        try:
+            result = worker(config)
+        except Exception as exc:
+            raise RuntimeError(
+                f"Worker failed for case={config['case_id']} "
+                f"dataset={config['dataset_id']} "
+                f"evaluator={config['evaluation_model']}"
+            ) from exc
 
-    score_std = float(score_df.std())
-    if pd.isna(score_std):
-        score_std = 0.0
+        results[group_id].append(result)
+        pbar.update(1)
+        tqdm.write(
+            "Run finished: "
+            f"case={config['case_id']} "
+            f"dataset={config['dataset_id']} "
+            f"evaluator={config['evaluation_model']} "
+            f"sample={config.get('sample_id', '?')}"
+        )
 
-    return {
-        "first": first,
-        "dataset_id": dataset_id,
-        "score_best": float(score_df.max()),
-        "score_worst": float(score_df.min()),
-        "score_avg": float(score_df.mean()),
-        "score_std": score_std,
-        "wall_avg_s": float(group_df["elapsed_wall_s"].mean()),
-        "cpu_avg_s": float(group_df["elapsed_cpu_s"].mean()),
-        "nfe_avg": float(group_df["evaluations_count"].mean()),
-        "champion_score": float(champion["final_score"]),
-        "nb_features_keep": int(champion["nb_features_keep"]),
-    }
-
-
-def print_feature_selection_summary(row, score_columns, header_columns):
-    tqdm.write("-" * 135)
-    summary = " | ".join(
-        f"{label} {row[column]}"
-        for label, column in header_columns
-    )
-    tqdm.write(summary)
-    tqdm.write(
-        f"Champion score: {row['Champion_Score']:.2f}% "
-        f"({row['Nb_Features_Keep']} features)"
-    )
-    tqdm.write("-" * 135)
-
-    best_col, worst_col, avg_col, std_col = score_columns
-    score_str = (
-        f"{row[best_col]:>5.0f} {row[worst_col]:>6.0f} "
-        f"{row[avg_col]:>6.1f} {row[std_col]:>5.1f}"
-    )
-    tqdm.write(f"{'Score':<15} | {score_str:<26}")
-
-    wall_col = next(column for column in row if column.endswith("Wall_Time_Avg(s)"))
-    cpu_col = next(column for column in row if column.endswith("CPU_Time_Avg(s)"))
-    nfe_col = next(column for column in row if column.endswith("NFE_Avg"))
-
-    tqdm.write(
-        f"{'Time Avg':<15} | wall {row[wall_col]:<7.3f}s | "
-        f"cpu {row[cpu_col]:<7.3f}s"
-    )
-    tqdm.write(f"{'NFE Avg':<15} | {row[nfe_col]:<26.1f} |")
-    tqdm.write("-" * 135)
+        if len(results[group_id]) == expected_counts[group_id]:
+            try:
+                values = summarize_results_group(results.pop(group_id), group_fields)
+                row = build_row_from_schema(values, csv_schema)
+                append_csv_rows(csv_filepath, columns, [row])
+            except Exception as exc:
+                raise RuntimeError(
+                    f"Failed to summarize/save case={config['case_id']} "
+                    f"dataset={config['dataset_id']} "
+                    f"evaluator={config['evaluation_model']}"
+                ) from exc
+    pbar.close()
