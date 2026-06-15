@@ -17,7 +17,7 @@ from app.Problem.Problem import Problem
 from app.Utilities.ConfigLoader import load_config
 from app.runners.common import (
     build_run_configs,
-    run_parallel_configs,
+    run_configs,
     save_raw_run_result,
 )
 
@@ -48,10 +48,6 @@ SA_CSV_SCHEMA = [
 SA_GROUP_FIELDS = [
     "case_id", "dataset_id", "initial_temp", "cooling_rate", "total_evals",
     "expected_final_temperature", "final_temperature",
-    "evaluation_model", "fitness_name", "alpha", "cv_folds",
-]
-SA_RESUME_FIELDS = [
-    "case_id", "dataset_id", "initial_temp", "cooling_rate", "total_evals",
     "evaluation_model", "fitness_name", "alpha", "cv_folds",
 ]
 SA_MONITORING_METRICS = [
@@ -175,10 +171,9 @@ class SAParameters:
         for c in configurations:
             c["total_evals"] = self.total_evals
 
-        run_parallel_configs(
+        run_configs(
             configurations, run_sa_config, self.csv_filepath, SA_CSV_SCHEMA,
             group_fields=SA_GROUP_FIELDS,
-            resume_fields=SA_RESUME_FIELDS,
             max_workers=14
         )
 

@@ -1,3 +1,14 @@
+import os
+
+for env_var in (
+    "OMP_NUM_THREADS",
+    "OPENBLAS_NUM_THREADS",
+    "MKL_NUM_THREADS",
+    "VECLIB_MAXIMUM_THREADS",
+    "NUMEXPR_NUM_THREADS",
+):
+    os.environ.setdefault(env_var, "1")
+
 import numpy as np
 
 from app.monitoring import MonitoringMetric
@@ -6,7 +17,7 @@ from app.Utilities.ConfigLoader import load_config
 from app.particle_swarm.algorithm import NewBinaryParticleSwarmOptimization
 from app.runners.common import (
     build_run_configs,
-    run_parallel_configs,
+    run_configs,
     save_raw_run_result,
 )
 
@@ -40,10 +51,12 @@ NBPSO_GROUP_FIELDS = [
     "case_id", "dataset_id", "swarm_size", "w", "c1", "c2", "vmax",
     "max_generations", "evaluation_model", "fitness_name", "alpha", "cv_folds",
 ]
-NBPSO_RESUME_FIELDS = list(NBPSO_GROUP_FIELDS)
-NBPSO_MONITORING_METRICS = [
+
+TIMING_METRICS = [
     MonitoringMetric.ELAPSED_TIME_NS.value,
     MonitoringMetric.CPU_TIME_NS.value,
+]
+RAW_MONITORING_METRICS = [
     MonitoringMetric.EVALUATION_COUNT.value,
     MonitoringMetric.BEST_FITNESS.value,
     MonitoringMetric.BEST_MASK.value,
@@ -51,8 +64,18 @@ NBPSO_MONITORING_METRICS = [
     MonitoringMetric.POPULATION_DIVERSITY.value,
 ]
 
-
 def run_nbpso_config(config):
+    print(
+        "Run starting: "
+        f"pid={os.getpid()} "
+        f"case={config['case_id']} "
+        f"dataset={config['dataset_id']} "
+        f"evaluator={config['evaluation_model']} "
+        f"sample={config.get('sample_id', '?')} "
+        f"swarm_size={config['swarm_size']} "
+        f"generations={config['max_generations']}",
+        flush=True,
+    )
     dataset_id = config["dataset_id"]
     evaluation_config = dict(config["evaluation_config"])
     problem = Problem.load_dataset(dataset_id, evaluation_config)
@@ -60,7 +83,7 @@ def run_nbpso_config(config):
     nbpso_config = dict(config)
     monitoring = dict(nbpso_config.get("monitoring", {}))
     monitoring_metrics = list(monitoring.get("metrics", []))
-    for metric in NBPSO_MONITORING_METRICS:
+    for metric in TIMING_METRICS + RAW_MONITORING_METRICS:
         if metric not in monitoring_metrics:
             monitoring_metrics.append(metric)
     monitoring["metrics"] = monitoring_metrics
@@ -102,7 +125,7 @@ def run_nbpso_config(config):
             "nb_features_keep": int(best_mask.sum()),
             "elapsed_wall_s": float(result.wall_ns / 1_000_000_000),
             "elapsed_cpu_s": float(result.cpu_ns / 1_000_000_000),
-            "evaluations_count": problem.evaluations_count,
+            "evaluations_count": result.evaluations,
         },
         "history": result.history,
     }
@@ -129,41 +152,44 @@ def run_nbpso_config(config):
         "nb_features_keep": int(best_mask.sum()),
         "elapsed_wall_s": float(result.wall_ns / 1_000_000_000),
         "elapsed_cpu_s": float(result.cpu_ns / 1_000_000_000),
-        "evaluations_count": problem.evaluations_count,
+        "evaluations_count": result.evaluations,
     }
 
 
 class NBPSOParameters:
     def __init__(self):
-        config = load_config()
-        self.dataset_ids = config.get("dataset_ids", [0])
-        self.runs_per_algo = config.get("runs_per_algo", 10)
-        self.cases = config.get("cases_NBPSO", [])
-        self.evaluation_cases = config.get("evaluation_cases", [{
+        self.config = load_config()
+        self.dataset_ids = self.config.get("dataset_ids", [0])
+        self.runs_per_algo = self.config.get("runs_per_algo", 10)
+        self.max_workers = self.config.get(
+            "nbpso_max_workers",
+            max(1, min(14, os.cpu_count() or 14)),
+        )
+        self.cases = self.config.get("cases_NBPSO_Table11_Swarm_Generations", [])
+        self.evaluation_cases = self.config.get("evaluation_cases", [{
             "evaluation_model": "svm",
             "fitness": "weighted_error",
             "alpha": 0.5,
             "cv_folds": 5,
         }])
-        self.csv_filepath = config.get(
-            "csv_filepath_nbpso",
-            "app/Results/SAParameters/NBPSOParameters_v2.csv",
-        )
-
-    def run_all(self):
-        configurations = list(build_run_configs(
+        self.csv_filepath = "app/Results/SAParameters/NBPSOParameters.csv"
+        
+        self.configurations = list(build_run_configs(
             self.dataset_ids,
             self.cases,
             self.evaluation_cases,
             self.runs_per_algo,
         ))
 
-        run_parallel_configs(
-            configurations, run_nbpso_config, self.csv_filepath, NBPSO_CSV_SCHEMA,
+    def run_all(self, parallel=True):
+        run_configs(
+            self.configurations, run_nbpso_config, self.csv_filepath, NBPSO_CSV_SCHEMA,
             group_fields=NBPSO_GROUP_FIELDS,
-            resume_fields=NBPSO_RESUME_FIELDS,
+            parallel=parallel,
+            max_workers=self.max_workers,
         )
 
 
 if __name__ == "__main__":
-    NBPSOParameters().run_all()
+    runner = NBPSOParameters()
+    runner.run_all(parallel=True)

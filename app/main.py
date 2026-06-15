@@ -6,10 +6,10 @@
 #os.environ["NUMEXPR_NUM_THREADS"] = "1" # NumExpr
 
 
-from app.runners.best_runner_sa_ea import BestRunnerSAEA
-from app.runners.comparison_runner import ComparisonRunner
-from app.runners.ea_convergence import EAConvergence
-from app.runners.ea_parameters import EAParameters
+from app.Archive.best_runner_sa_ea import BestRunnerSAEA
+from app.Archive.comparison_runner import ComparisonRunner
+from app.Archive.ea_convergence import EAConvergence
+from app.Archive.ea_parameters import EAParameters
 from app.runners.sa_parameters import SAParameters
 from app.runners.de_parameters import DEParameters
 from app.runners.nbpso_parameters import NBPSOParameters

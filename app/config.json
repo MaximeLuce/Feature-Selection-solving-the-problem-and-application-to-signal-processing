@@ -639,13 +639,33 @@
     ],
     "cases_NBPSO_Table11_Swarm_Generations": [
         {
-            "id": "nbpso_1",
+            "id": "55",
+            "swarm_size": 100,
+            "max_generations": 100,
+            "seed": 42,
+            "w": 0.729,
+            "c1": 1.49445,
+            "c2": 1.49445,
+            "vmax": 4.0
+        },
+        {
+            "id": "56",
             "swarm_size": 50,
             "max_generations": 200,
             "seed": 42,
-            "w": 0.7,
-            "c1": 1.5,
-            "c2": 1.5,
+            "w": 0.729,
+            "c1": 1.49445,
+            "c2": 1.49445,
+            "vmax": 4.0
+        },
+        {
+            "id": "57",
+            "swarm_size": 20,
+            "max_generations": 500,
+            "seed": 42,
+            "w": 0.729,
+            "c1": 1.49445,
+            "c2": 1.49445,
             "vmax": 4.0
         }
     ],

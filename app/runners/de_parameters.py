@@ -19,8 +19,7 @@ from app.Problem import Problem
 from app.Utilities.ConfigLoader import load_config
 from app.runners.common import (
     build_run_configs,
-    run_parallel_configs,
-    run_sequential_configs,
+    run_configs,
     save_raw_run_result,
 )
 
@@ -52,7 +51,6 @@ DE_GROUP_FIELDS = [
     "case_id", "dataset_id", "strategy", "popsize", "max_generations",
     "decoder_name", "evaluation_model", "fitness_name", "alpha", "cv_folds",
 ]
-DE_RESUME_FIELDS = list(DE_GROUP_FIELDS)
 
 TIMING_METRICS = [
     MonitoringMetric.ELAPSED_TIME_NS.value,
@@ -108,7 +106,7 @@ def run_de_config(config):
     final_score = float(problem.evaluate_final(best_mask) * 100)
 
     raw_dir = "app/Results/raw"
-    raw_filename = "cases_AMDE_Table9_F_CR_Sweep.jsonl"
+    raw_filename = "cases_BDE_Table6_F_CR_Sweep.jsonl"
     raw_data = {
         "config": {
             "case_id": config["case_id"],
@@ -169,7 +167,7 @@ class DEParameters:
             "de_max_workers",
             max(1, min(14, os.cpu_count() or 14)),
         )
-        self.cases = self.config.get("cases_AMDE_Table9_F_CR_Sweep", [])
+        self.cases = self.config.get("cases_BDE_Table6_F_CR_Sweep", [])
     
         self.evaluation_cases = self.config.get("evaluation_cases", [{
             "evaluation_model": "svm",
@@ -178,7 +176,7 @@ class DEParameters:
             "cv_folds": 5,
         }])
         
-        self.csv_filepath = "app/Results/SAParameters/AMDE_Table9_F_CR_Sweep.csv"
+        self.csv_filepath = "app/Results/SAParameters/BDE_Table6_F_CR_Sweep.csv"
         
         #self.dataset_ids = [0]
         #self.cases = [self.cases[0]]
@@ -190,51 +188,15 @@ class DEParameters:
     
         self.configurations = list(build_run_configs(self.dataset_ids, self.cases, self.evaluation_cases, self.runs_per_algo))
         
-    def run_all_parallel(self):
-        run_parallel_configs(
+    def run_all(self, parallel=True):
+        run_configs(
             self.configurations, run_de_config, self.csv_filepath, DE_CSV_SCHEMA,
             group_fields=DE_GROUP_FIELDS,
-            resume_fields=DE_RESUME_FIELDS,
+            parallel=parallel,
             max_workers=self.max_workers,
         )   
-        
-    def run_all_sequential(self):
-        run_sequential_configs(
-            self.configurations, run_de_config, self.csv_filepath, DE_CSV_SCHEMA,
-            group_fields=DE_GROUP_FIELDS,
-            resume_fields=DE_RESUME_FIELDS,
-        )
-
-
-    def run_profile_config(
-        self,
-        config_index=0,
-        max_generations=None,
-        popsize=None,
-    ):
-        if not self.configurations:
-            raise ValueError("No DE configurations are available to profile.")
-        if not 0 <= config_index < len(self.configurations):
-            raise IndexError(
-                f"Configuration index {config_index} is out of range "
-                f"(0..{len(self.configurations) - 1})."
-            )
-
-        config = dict(self.configurations[config_index])
-        if max_generations is not None:
-            config["max_generations"] = max_generations
-        if popsize is not None:
-            config["popsize"] = popsize
-        print(
-            "Profiling DE configuration "
-            f"{config_index}: dataset={config['dataset_id']} "
-            f"case={config['case_id']} model={config['evaluation_model']}"
-        )
-        return run_de_config(config)
-
 
 
 if __name__ == "__main__":
     runner = DEParameters()
-    #runner.run_all_sequential()
-    runner.run_all_parallel()
+    runner.run_all(parallel=True)

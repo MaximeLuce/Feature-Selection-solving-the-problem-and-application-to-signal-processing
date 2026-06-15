@@ -3,7 +3,6 @@
 import csv
 import json
 import os
-from collections import OrderedDict
 from concurrent.futures import ProcessPoolExecutor, as_completed
 
 import filelock
@@ -65,7 +64,6 @@ def ensure_csv_header(csv_filepath, columns):
     if existing_header != columns:
         raise ValueError(
             f"CSV header mismatch for {csv_filepath}. "
-            "Use a new output file or align the schema."
         )
 
 
@@ -96,25 +94,17 @@ def save_raw_run_result(raw_dir, result_dict, filename):
             file.write(json.dumps(result_dict) + "\n")
 
 
-def schema_column_by_key(csv_schema):
-    return {item["key"]: item["column"] for item in csv_schema}
-
-
-def normalize_group_key(values):
-    return tuple(str(value) for value in values)
-
-
-def completed_group_keys(csv_filepath, key_columns, csv_schema):
+def _completed_group_keys(csv_filepath, key_columns, csv_schema):
     completed = set()
     if not os.path.isfile(csv_filepath):
         return completed
 
-    key_to_column = schema_column_by_key(csv_schema)
+    key_to_column = {item["key"]: item["column"] for item in csv_schema}
     with open(csv_filepath, mode="r", newline="") as file:
         reader = csv.DictReader(file, delimiter=";")
         for row in reader:
-            key = normalize_group_key(
-                row.get(key_to_column[column], "")
+            key = tuple(
+                str(row.get(key_to_column[column], ""))
                 for column in key_columns
             )
             completed.add(key)
@@ -162,57 +152,90 @@ def summarize_results_group(group_results, group_fields):
     return summary
 
 
-def _group_configurations(configurations):
-    grouped = OrderedDict()
+def _pending_groups(configurations, group_fields, csv_schema, csv_filepath):
+    completed = _completed_group_keys(csv_filepath, group_fields, csv_schema)
+    grouped = {}
     for config in configurations:
         grouped.setdefault(config["group_id"], []).append(config)
-    return list(grouped.items())
-
-
-def _pending_groups(configurations, resume_fields, csv_schema, csv_filepath):
-    grouped = _group_configurations(configurations)
-    completed = completed_group_keys(csv_filepath, resume_fields, csv_schema)
     pending = []
-    for group_id, configs in grouped:
+    for group_id, configs in grouped.items():
         first = configs[0]
-        key = normalize_group_key(first.get(field, "") for field in resume_fields)
+        key = tuple(
+            str(first.get(field, ""))
+            for field in group_fields
+        )
         if key not in completed:
             pending.append((group_id, configs))
     return pending
 
 
-def run_parallel_configs(
+def _collect_result(
+    result, config, results, expected_counts, pbar, group_fields, csv_schema, csv_filepath
+):
+    
+    columns = [item["column"] for item in csv_schema]
+    group_id = config["group_id"]
+    expected = expected_counts[group_id]
+    finished = len(results[group_id])
+    results[group_id].append(result)
+    pbar.update(1)
+    tqdm.write(
+        "Run finished: "
+        f"case={config['case_id']} "
+        f"dataset={config['dataset_id']} "
+        f"evaluator={config['evaluation_model']} "
+        f"group_progress={finished}/{expected} "
+    )
+
+    if finished == expected:
+        values = summarize_results_group(results.pop(group_id), group_fields)
+        row = build_row_from_schema(values, csv_schema)
+        append_csv_rows(csv_filepath, columns, [row])
+
+
+def run_configs(
     configurations,
     worker,
     csv_filepath,
     csv_schema,
     group_fields,
-    resume_fields=None,
+    parallel=True,
     max_workers=None,
 ):
-    resume_fields = resume_fields or group_fields
     columns = [item["column"] for item in csv_schema]
     ensure_csv_header(csv_filepath, columns)
 
-    pending_groups = _pending_groups(configurations, resume_fields, csv_schema, csv_filepath)
+    pending_groups = _pending_groups(configurations, group_fields, csv_schema, csv_filepath)
     pending_configs = [config for _, group in pending_groups for config in group]
     results = {group_id: [] for group_id, _ in pending_groups}
     expected_counts = {group_id: len(group) for group_id, group in pending_groups}
 
     worker_count = max_workers or (os.cpu_count() or 4)
     if pending_configs:
-        tqdm.write(f"Submitting {len(pending_configs)} runs across {worker_count} workers.")
+        if parallel:
+            tqdm.write(f"Submitting {len(pending_configs)} runs across {worker_count} workers.")
+        else:
+            tqdm.write(f"Running {len(pending_configs)} runs sequentially.")
     else:
         tqdm.write("No pending runs to execute.")
 
     pbar = tqdm(total=len(pending_configs), desc="completed runs", unit="run")
-    executor = ProcessPoolExecutor(max_workers=worker_count)
-    futures = {}
-    try:
+
+    if not parallel:
+        for config in pending_configs:
+            result = worker(config)
+
+            _collect_result(
+                result, config, results, expected_counts, pbar,
+                group_fields, csv_schema, csv_filepath
+            )
+        pbar.close()
+        return
+
+    with ProcessPoolExecutor(max_workers=worker_count) as executor:
         futures = {executor.submit(worker, config): config for config in pending_configs}
         for future in as_completed(futures):
             config = futures[future]
-            group_id = config["group_id"]
             try:
                 result = future.result()
             except Exception as exc:
@@ -222,91 +245,8 @@ def run_parallel_configs(
                     f"evaluator={config['evaluation_model']}"
                 ) from exc
 
-            results[group_id].append(result)
-            pbar.update(1)
-            tqdm.write(
-                "Run finished: "
-                f"case={config['case_id']} "
-                f"dataset={config['dataset_id']} "
-                f"evaluator={config['evaluation_model']} "
-                f"sample={config.get('sample_id', '?')}"
+            _collect_result(
+                result, config, results, expected_counts, pbar,
+                group_fields, csv_schema, csv_filepath
             )
-
-            if len(results[group_id]) == expected_counts[group_id]:
-                try:
-                    values = summarize_results_group(results.pop(group_id), group_fields)
-                    row = build_row_from_schema(values, csv_schema)
-                    append_csv_rows(csv_filepath, columns, [row])
-                except Exception as exc:
-                    raise RuntimeError(
-                        f"Failed to summarize/save case={config['case_id']} "
-                        f"dataset={config['dataset_id']} "
-                        f"evaluator={config['evaluation_model']}"
-                    ) from exc
-    except Exception:
-        for future in futures:
-            future.cancel()
-        executor.shutdown(wait=False, cancel_futures=True)
-        raise
-    else:
-        executor.shutdown(wait=True, cancel_futures=False)
-    finally:
-        pbar.close()
-
-
-def run_sequential_configs(
-    configurations,
-    worker,
-    csv_filepath,
-    csv_schema,
-    group_fields,
-    resume_fields=None,
-):
-    resume_fields = resume_fields or group_fields
-    columns = [item["column"] for item in csv_schema]
-    ensure_csv_header(csv_filepath, columns)
-
-    pending_groups = _pending_groups(configurations, resume_fields, csv_schema, csv_filepath)
-    pending_configs = [config for _, group in pending_groups for config in group]
-    results = {group_id: [] for group_id, _ in pending_groups}
-    expected_counts = {group_id: len(group) for group_id, group in pending_groups}
-
-    if pending_configs:
-        tqdm.write(f"Running {len(pending_configs)} runs sequentially.")
-    else:
-        tqdm.write("No pending runs to execute.")
-
-    pbar = tqdm(total=len(pending_configs), desc="completed runs", unit="run")
-    for config in pending_configs:
-        group_id = config["group_id"]
-        try:
-            result = worker(config)
-        except Exception as exc:
-            raise RuntimeError(
-                f"Worker failed for case={config['case_id']} "
-                f"dataset={config['dataset_id']} "
-                f"evaluator={config['evaluation_model']}"
-            ) from exc
-
-        results[group_id].append(result)
-        pbar.update(1)
-        tqdm.write(
-            "Run finished: "
-            f"case={config['case_id']} "
-            f"dataset={config['dataset_id']} "
-            f"evaluator={config['evaluation_model']} "
-            f"sample={config.get('sample_id', '?')}"
-        )
-
-        if len(results[group_id]) == expected_counts[group_id]:
-            try:
-                values = summarize_results_group(results.pop(group_id), group_fields)
-                row = build_row_from_schema(values, csv_schema)
-                append_csv_rows(csv_filepath, columns, [row])
-            except Exception as exc:
-                raise RuntimeError(
-                    f"Failed to summarize/save case={config['case_id']} "
-                    f"dataset={config['dataset_id']} "
-                    f"evaluator={config['evaluation_model']}"
-                ) from exc
     pbar.close()
