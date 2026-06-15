@@ -1,13 +1,24 @@
-import time
+import os
+
+for env_var in (
+    "OMP_NUM_THREADS",
+    "OPENBLAS_NUM_THREADS",
+    "MKL_NUM_THREADS",
+    "VECLIB_MAXIMUM_THREADS",
+    "NUMEXPR_NUM_THREADS",
+):
+    os.environ.setdefault(env_var, "1")
 
 import numpy as np
 
+from app.monitoring import MonitoringMetric
 from app.OptimizationAlgorithm.SimulatedAnnealing import SimulatedAnnealing
 from app.Problem.Problem import Problem
 from app.Utilities.ConfigLoader import load_config
 from app.runners.common import (
     build_run_configs,
     run_parallel_configs,
+    save_raw_run_result,
 )
 
 SA_CSV_SCHEMA = [
@@ -16,6 +27,8 @@ SA_CSV_SCHEMA = [
     {"column": "Initial_Temp", "key": "initial_temp"},
     {"column": "Cooling_Rate", "key": "cooling_rate"},
     {"column": "Total_Evals", "key": "total_evals"},
+    {"column": "Expected_Final_Temp", "key": "expected_final_temperature", "digits": 8},
+    {"column": "Final_Temp", "key": "final_temperature", "digits": 8},
     {"column": "Evaluator", "key": "evaluation_model"},
     {"column": "Fitness", "key": "fitness_name"},
     {"column": "Alpha", "key": "alpha"},
@@ -32,22 +45,84 @@ SA_CSV_SCHEMA = [
     {"column": "Nb_Features_Keep", "key": "nb_features_keep", "digits": 2},
 ]
 
+SA_GROUP_FIELDS = [
+    "case_id", "dataset_id", "initial_temp", "cooling_rate", "total_evals",
+    "expected_final_temperature", "final_temperature",
+    "evaluation_model", "fitness_name", "alpha", "cv_folds",
+]
+SA_RESUME_FIELDS = [
+    "case_id", "dataset_id", "initial_temp", "cooling_rate", "total_evals",
+    "evaluation_model", "fitness_name", "alpha", "cv_folds",
+]
+SA_MONITORING_METRICS = [
+    MonitoringMetric.ELAPSED_TIME_NS.value,
+    MonitoringMetric.CPU_TIME_NS.value,
+    MonitoringMetric.EVALUATION_COUNT.value,
+    MonitoringMetric.BEST_FITNESS.value,
+    MonitoringMetric.BEST_MASK.value,
+    MonitoringMetric.CURRENT_MASK.value,
+    MonitoringMetric.CURRENT_FITNESS.value,
+    MonitoringMetric.TEMPERATURE.value,
+    MonitoringMetric.ACCEPTANCE_RATE.value,
+    MonitoringMetric.FINAL_TEMPERATURE.value,
+]
+
 
 def run_sa_config(config):
     dataset_id = config["dataset_id"]
     evaluation_config = dict(config["evaluation_config"])
+    evaluation_config["seed"] = config["seed"]
     problem = Problem.load_dataset(dataset_id, evaluation_config)
 
-    sa = SimulatedAnnealing(problem, config["total_evals"], config["initial_temp"], config["cooling_rate"])
+    monitoring = dict(config.get("monitoring", {}))
+    monitoring_metrics = list(monitoring.get("metrics", []))
+    for metric in SA_MONITORING_METRICS:
+        if metric not in monitoring_metrics:
+            monitoring_metrics.append(metric)
+    monitoring["metrics"] = monitoring_metrics
 
-    wall_start = time.perf_counter_ns()
-    cpu_start = time.thread_time_ns()
-    best_ind = sa.run()
-    wall_ns = time.perf_counter_ns() - wall_start
-    cpu_ns = time.thread_time_ns() - cpu_start
+    sa = SimulatedAnnealing(
+        problem,
+        max_evaluations=config["total_evals"],
+        initial_temp=config["initial_temp"],
+        cooling_rate=config["cooling_rate"],
+        seed=config["seed"],
+        monitoring=monitoring,
+    )
+    result = sa.run()
 
-    best_mask = np.array(best_ind.features_mask, dtype=int)
+    best_mask = np.array(result.best_mask, dtype=int)
     final_score = float(problem.evaluate_final(best_mask) * 100)
+
+    # Append raw result to shared JSONL file
+    raw_dir = "app/Results/raw"
+    raw_filename = "SA_raw_cases_SA_Table10.jsonl"
+    raw_data = {
+        "config": {
+            "case_id": config["case_id"],
+            "dataset_id": dataset_id,
+            "initial_temp": config["initial_temp"],
+            "cooling_rate": config["cooling_rate"],
+            "total_evals": config["total_evals"],
+            "expected_final_temperature": result.expected_final_temperature,
+            "final_temperature": result.final_temperature,
+            "base_seed": config["base_seed"],
+            "evaluation_model": evaluation_config["evaluation_model"],
+            "fitness_name": evaluation_config["fitness"],
+            "alpha": evaluation_config["alpha"],
+            "cv_folds": evaluation_config["cv_folds"],
+        },
+        "summary": {
+            "best_fitness": float(result.best_fitness),
+            "final_score": final_score,
+            "nb_features_keep": int(best_mask.sum()),
+            "elapsed_wall_s": float(result.wall_ns / 1_000_000_000),
+            "elapsed_cpu_s": float(result.cpu_ns / 1_000_000_000),
+            "evaluations_count": result.evaluations,
+        },
+        "history": result.history,
+    }
+    save_raw_run_result(raw_dir, raw_data, raw_filename)
 
     return {
         "run_id": config["run_id"],
@@ -56,17 +131,19 @@ def run_sa_config(config):
         "initial_temp": config["initial_temp"],
         "cooling_rate": config["cooling_rate"],
         "total_evals": config["total_evals"],
+        "expected_final_temperature": float(result.expected_final_temperature),
+        "final_temperature": float(result.final_temperature),
         "base_seed": config["base_seed"],
         "evaluation_model": evaluation_config["evaluation_model"],
         "fitness_name": evaluation_config["fitness"],
         "alpha": evaluation_config["alpha"],
         "cv_folds": evaluation_config["cv_folds"],
-        "best_fitness": float(best_ind.fitness),
+        "best_fitness": float(result.best_fitness),
         "final_score": final_score,
         "nb_features_keep": int(best_mask.sum()),
-        "elapsed_wall_s": float(wall_ns / 1_000_000_000),
-        "elapsed_cpu_s": float(cpu_ns / 1_000_000_000),
-        "evaluations_count": problem.evaluations_count,
+        "elapsed_wall_s": float(result.wall_ns / 1_000_000_000),
+        "elapsed_cpu_s": float(result.cpu_ns / 1_000_000_000),
+        "evaluations_count": result.evaluations,
     }
 
 
@@ -76,7 +153,7 @@ class SAParameters:
         self.dataset_ids = config.get("dataset_ids", [0])
         self.runs_per_algo = config.get("runs_per_algo", 10)
         self.total_evals = config.get("total_evals", 10000)
-        self.cases = config.get("cases_SA_initial_temp", [])
+        self.cases = config.get("cases_SA_Table10", [])
         self.evaluation_cases = config.get("evaluation_cases", [{
             "evaluation_model": "svm",
             "fitness": "weighted_error",
@@ -85,7 +162,7 @@ class SAParameters:
         }])
         self.csv_filepath = config.get(
             "csv_filepath",
-            "app/Results/SAParameters/SAParameters_Best_Initial_Temperature.csv",
+            "app/Results/SAParameters/SAParameters_cases_SA_Table10.csv",
         )
 
     def run_all(self):
@@ -100,10 +177,9 @@ class SAParameters:
 
         run_parallel_configs(
             configurations, run_sa_config, self.csv_filepath, SA_CSV_SCHEMA,
-            group_columns=[
-                "case_id", "dataset_id", "initial_temp", "cooling_rate",
-                "evaluation_model", "fitness_name", "alpha", "cv_folds",
-            ],
+            group_fields=SA_GROUP_FIELDS,
+            resume_fields=SA_RESUME_FIELDS,
+            max_workers=14
         )
 
 

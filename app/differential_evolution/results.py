@@ -1,5 +1,3 @@
-# results.py
-
 from dataclasses import dataclass, field
 from typing import Any
 
@@ -7,8 +5,15 @@ import numpy as np
 
 
 @dataclass
+class PopulationEvaluation:
+    fitness: np.ndarray
+    masks: np.ndarray | None = None
+
+
+@dataclass
 class DEResult:
-    best: np.ndarray
+    best_vector: np.ndarray
+    best_mask: np.ndarray
     best_fitness: float
     generations: int
     evaluations: int

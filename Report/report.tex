@@ -1,0 +1,1425 @@
+\documentclass[12pt, openany]{article}
+
+\usepackage{import}
+\usepackage{config}
+
+\usepackage{xcolor}
+\usepackage{makeidx}
+\usepackage{multicol}
+
+\usepackage[]{caption}
+
+\usepackage[sorting=none]{biblatex}
+
+\addbibresource{biblio.bib}
+%\renewcommand*{\bibfont}{\small}
+%\setlength{\bibitemsep}{0pt} % Pas d'espace entre les références
+
+
+%{\fontsize{10pt}{14pt}\selectfont}
+%{\scriptsize}
+
+
+
+
+
+\begin{document}
+\lstset{inputencoding=utf8/latin1}
+\renewcommand{\labelitemi}{$\bullet$}
+
+\begin{titlepage}
+  \begin{sffamily}
+  \begin{center}
+
+    \includegraphics[width=0.9\linewidth]{logo.png}~\\[0.5cm]
+
+    %\textsc{ds\LARGE }\\[2cm]
+
+    \textsc{\Large Optimization Methods \\ Project Group 1}\\[1.5cm]
+
+
+    \color{centrale_red}\HRule \\[0cm]
+    { \huge \bfseries \color{centrale_red} Feature Selection\\ }
+
+    \HRule \\[0.5cm]
+
+    {\Large \bfseries \color{centrale_red} Main Project\\ --- Project's Report --- }
+    \color{black}
+    %\includegraphics[width=0.8\textwidth]{CM/granta/moduleYoung_coursIDM.png}
+    %\begin{center}
+     %    Les différentes familles de matériaux illustrées par leur module d'Young\\(Source : \cite{diapoIDMcha1})
+    %\end{center}
+    %\\%[2cm]
+
+    \vspace{2.5cm}
+
+    \begin{minipage}{0.4\textwidth}
+      \begin{flushleft} \large
+      \textit{\textbf{Student}} \\[0.5cm]
+
+       Sczymon \textsc{Cichy}\\
+    \textit{Student ID: XXX}\\[0.25cm]
+
+    
+    Maxime \textsc{Luce} \\
+    \textit{Student ID: 294 620}
+
+   
+
+  
+      \end{flushleft}
+    \end{minipage}
+    \begin{minipage}{0.4\textwidth}
+      \begin{flushright} \large
+      \textit{\textbf{Teacher}} \\[0.5cm]
+      Konrad \textsc{Gmyrek}\\
+       Marcin \textsc{Komarnicki}\\
+      \end{flushright}
+    \end{minipage}
+
+    \vfill
+
+
+    {Academic year 2025/2026 -- \today}
+
+  \end{center}
+  \end{sffamily}
+\end{titlepage}
+
+\clearpage % end title page
+
+%\begingroup
+%  \pagestyle{empty}
+%  \null
+%  \newpage
+%\endgroup
+
+\tableofcontents
+
+\newpage
+
+\section*{Introduction}
+
+This document aims to present the main results of the project on \emph{Feature Selection} (FS), which is an optimization problem. We are indeed considering a set of variables and we aim to select the most relevant in a specific subset. This feature selection can be very useful to reduce data processing, to detect the core characteristics of a system or to train efficiently a model. In fact, we have two different objectives: we want to select as few features as possible and we want to have the more accurate model for our characteristics.
+
+Some optimization problems are so hard that we can't find any algorithm, \textit{i.e.} a finite sequence of instructions in order to get the best solution, to solve it. In complexity theory, we can define an NP problem by two properties: we can easily verify a solution -- polynomial complexity -- but we cannot design a process to build an efficient solution. The FS is an example of NP-problem, so we need to explore different approaches to find the best solution possible. As it is a two-objectives problem, we will first map it into a single objective binary problem. By doing so, we will be able to implement and compare single-objective optimizers such as \emph{Differential Evolution} (DE), \emph{Simulated Annealing} (SA) and \emph{Particle Swarm Optimization} (PSO). We will finally compare our results with a multi-objective optimizers \emph{Non-Domintaed Sorting Genetic Algorithm 2} (NSGA-II).
+
+In order to run our numerical experiments, we will use several datasets with different number of features and of instances. In that way, we will discuss and compare the performance or each method regarding the size of the considered problem.
+
+We will start by presenting the \emph{feature selection problem} and presenting our datasets \ref{sec:fs}. Then, we will provide some theoretical review on formalizing an optimization problem and on effective methods to solve it \ref{sec:theoretical_review}. We will also present our implementation and protocol for our numerical analysis \ref{sec:implementation_protocol}. Finally, we will present our method to determine the best set of parameters for our algorithms \ref{sec:finding_optimal_parameters} and, to finish, we will present our results and analysis to the given problem \ref{sec:results_analysis}.
+
+\section{The Feature Selection Problem}\label{sec:fs}
+
+This section aims to present extensively our problem. We will provide a general overview \ref{sec:general_overview}, then we will describe our objectives \ref{sec:objectives}. The chosen problem representation is then explained \ref{sec:chosen_problem_representation} before mentioning the specifics of our problem \ref{sec:specifics} and our specific constraints \ref{sec:constraints}. Finally, we will describe the datasets used to run our numerical experiments \ref{sec:datasets}.
+
+\subsection{General overview}\label{sec:general_overview}
+
+Let's consider a set of features $\mathcal{S}$ that describes a complex systems with multiple characteristics. The \emph{feature selection} is a process designed to select the minimal subset $\mathcal{T} \subset \mathcal{S}$ that contains relevant features to describe a specific characteristic.
+
+Hence, this is a multi-objective problem as we aim to to maximize the performance of our model and reduce the number of features used to describe our characteristic.
+
+In order to map the 2-objective problem into a single-objective problem, we use a weight $\alpha \in \lbrack 0,1 \rbrack$ so that we can define our fitness as following:
+
+\begin{equation}\label{eq:objective_function}
+    f(x) = \alpha E(x) + (1-\alpha) \frac{\abs{\mathcal{T}}}{\abs{\mathcal{S}}},
+\end{equation}
+
+where $E(x)$ is the classification error, $\abs{\mathcal{T}}$ the number of selected features and $\abs{\mathcal{S}}$ the total number of features.
+
+\subsection{Objectives}\label{sec:objectives}
+
+Our main goal is to determine the best binary sequence $s^*$ that minimize the number of selected features and maximize the accuracy of the model so that minimize the objective function defined in \eqref{eq:objective_function} using a weight to map the two-objectives problem into a single-objective problem.
+
+In order to achieve that, our goal is to describe, implement and compare several methods (\tableref{methods_objectives}) : DE, SA and PSO.
+
+Finally, this comparison and the analysis will let us determine the best subset of features for each method and in which situation each method is better.
+
+\begin{table}[H]
+    \centering
+    \renewcommand{\arraystretch}{1.5}
+    \begin{tabularx}{\textwidth}{|>{\centering\arraybackslash}p{4cm}|>{\centering\arraybackslash}p{2.5cm}|X|}
+        \hline 
+        \textbf{Method} & \textbf{References} & \textbf{Description} \\ \hline
+
+        \textbf{Differential Evolution (DE)} & \cite{storn1997differential}, \cite{przewozniczek_de}, \cite{1688535} & The differential evolution is a metaheuristics which is a part of evolutionary algorithm: it aims to improve step by step a candidate solution within a population using an approach base on the difference of several vectors which are individuals in the population. It was originally designed for continuous search spaces but several variants are developed for binary search space such as the BDE or AMDE (see \ref{sec:bde}).\\ \hdashline
+
+        \textbf{Simulated Annealing (SA)} & \cite{wiki_recuit_simule_fr}, \cite{kirkpatrick1983optimization}, \cite{lacroix2001markov} & The simulated annealing is a metaheuristic inspired by the physical annealing of metals. It uses a cooling rate to probabilistically accept worse solutions during first iterations (exploration), and then going to the local optimum (exploitation) as the temperature drops. \\ \hdashline
+
+        \textbf{Particle Swarm Optimization (PSO)} & \cite{kennedy1995particle, przewozniczek_pso, vandenbergh2006study, kennedy1997discrete,4433821} & Using the analogy of a bird (assimilated with particle) swarm, the PSO is a metaheuristics that use position and velocity to move the particle toward the best direction. It has a "leader" of the swarm and each other particle are free to move on their own but follow the same common general direction. It was originally designed for continuous search spaces but several variants are developed for binary search space such as the BPSO or NBPSO (see \ref{sec:binary_PSO}).\\ 
+
+        \hline
+    \end{tabularx}
+    \caption{\textbf{Description of methods to be implemented.} Each method is presented by its name, the related references used in the report, and a short description.}
+    \label{tab:methods_objectives}
+\end{table}
+
+\subsection{Chosen problem representation}\label{sec:chosen_problem_representation}
+
+For a given set of features $\mathcal{S}$, we will write a binary sequence $s$ of size $\abs{\mathcal{S}}$. For each bit on position $i$, if $s(i)=1$, then the $i-$th feature is selected. Otherwise, if $s(i)=0$, the $i-$the feature is not selected.
+
+{\color{blue} EXAMPLE}
+
+\subsection{Specifics}\label{sec:specifics}
+
+The FS problem has different core characteristics and specifics that motive us to use certain type of optimizers.
+
+First, as illustrated in subsection \ref{sec:chosen_problem_representation}, each feature can either be selected or discard. Therefore the search space contains $2^{\abs{\mathcal{S}}}$ possible combinations and it is a \emph{combinatorial} search space. $2^{\abs{\mathcal{S}}}$ is in fact the cardinal of all parties of the set $\mathcal{S}$. We can observe, hence, that this is an exponential growth that makes exhaustive search impossible and explains the need of metaheuristics.
+
+Then, we need to specify our fitness function shortly presented in \eqref{eq:objective_function} as it is based on another function which is the classification error $E(x)$. To compute this error, a machine learning classifier (described in subsection \ref{sec:ligh_model}) must be trained and evaluated using cross-validation on the selected subset $\mathcal{T}$ for every candidate solution. Therefor, this evaluation step is computationally expensive.
+
+Finally, most of our optimizers (\tableref{methods_objectives}) are commonly defined in continuous search space (see for instance \cite{przewozniczek_ga_basics}, \cite{przewozniczek_de}, \cite{przewozniczek_pso}) so we need to map the real value $x_i$ to binary value $x_i^{\text{bit}}$. We will discuss this mapping for each optimizer in section \ref{sec:theoretical_review} but this can be generally done using a sigmoid function (see \eqref{eq:sigmoid} and \figref{sigmoid}).
+
+\subsection{Constraints}\label{sec:constraints}
+
+To ensure that the solutions generated by our algorithms are valid and evaluable, we need to handle non-empty subset and to use a strict binary sequence.
+
+First, a machine learning model cannot be trained without any input data. Therefore, a candidate solution cannot be a zero-vector. It means that we must select at least one feature. Hence, by writing $s(i)$ the $i-$th value of the binary sequence $s$, we have the following constraint
+
+\begin{equation}\label{eq:non_zero_constraint}
+    \sum_{i=1}^{\abs{\mathcal{S}}} s(i) \geq 1
+\end{equation}
+
+If an optimizer generates a totally empty subset (all zeros), a penalty must be applied to its fitness score, or the solution must be fixed so that we can compute the fitness value. We can for example mention randomly flipping one bit to $1$ before evaluation.
+    
+Then, the final decoded solution used to mask the dataset must consist strictly of boolean values, meaning $s(i) \in \{0, 1\}$ for all $i \in \{1, \dots, \abs{\mathcal{S}}\}$. Any other continuous values generated by the algorithms must be strictly converted before the evaluation of $E(x)$ to make our approach consistent.
+
+\subsection{Datasets}\label{sec:datasets}
+
+In order to compare all different methods on different instances, we choose 5 different datasets that are presented in \tableref{methods_objectives}.
+{\color{blue} Description here to do}
+
+\begin{table}[H]
+    \centering
+    \renewcommand{\arraystretch}{1.5}
+    \begin{tabularx}{\textwidth}{|c|>{\centering\arraybackslash}p{4cm}|c|c|X|}
+        \hline 
+        \textbf{Number} & \textbf{Name} & \textbf{Features} & \textbf{Instances} & \textbf{Description} \\ \hline
+
+        \textbf{1} & Parkinsons & $22$ & $197$ & Desc \newline \href{https://archive.ics.uci.edu/dataset/174/parkinsons}{UCI ID 174}
+        \\ \hdashline
+
+        \textbf{2} & Breast Cancer Wisconsin (Diagnostic) & 30 & 569 & Desc \newline \href{https://archive.ics.uci.edu/dataset/17/breast+cancer+wisconsin+diagnostic}{UCI ID 17}
+        \\ \hdashline
+
+        \textbf{3} & Ionosphere & 34 & 351 & Desc \newline \href{https://archive.ics.uci.edu/dataset/52/ionosphere}{UCI ID 52}
+        \\ \hdashline
+
+        \textbf{4} & Connectionist Bench (Sonar, Mines vs. Rocks) & 60 & 208 & Desc \newline \href{https://archive.ics.uci.edu/dataset/151/connectionist+bench+sonar+mines+vs+rocks}{UCI ID 151}
+        \\ \hdashline
+
+        \textbf{5} & Sonar Dataset, Underwater Object Classification & 46 & 3330 & Desc \newline \href{https://www.kaggle.com/datasets/meruvakodandasuraj/sonar-dataset-underwater-object-classification}{Kaggle}
+        \\ 
+
+        \hline
+    \end{tabularx}
+    \caption{\textbf{Description of the datasets used to run our numerical experiments.} Each dataset is presented by its name, number of features, number of instances and a small description containing its link.}
+    \label{tab:methods_objectives}
+\end{table}
+
+\subsection{Application to \textit{Signal Processing}}
+
+
+\section{Theoretical review}\label{sec:theoretical_review}
+
+\subsection{Solving an Optimization problem : Exploration and Exploitation}\label{sec:optimization_problem_exploration_exploitation}
+
+When it comes to find an optimal solution to a given problem, we can first try to describe well our problem. They are two main categories of problem : \emph{combinatorial} and \emph{topological}. In optimization, a \emph{topological} problem seeks the best continuous distribution of material within a physical space (such as designing the most efficient shape for a mechanical component), whereas a \emph{combinatorial} problem involves finding the optimal discrete arrangement from a finite set of possibilities (such as finding the best sequence of tasks in the PFSP).
+
+A general $n-$dimensional optimization problem is described by an objective function $f$
+
+\begin{equation}
+    f:\mathcal{D}_f \subset \mathbb{R}^n \to R ,
+\end{equation}
+
+where $\mathcal{D}_f$ is the solution search space. Our objective is therefore to find $x^*$ which can be the maximum or the minimum of $f$, let's assume we are looking for a maximum (even though it means changing $f$ to $-f$).
+
+\begin{equation}
+    x^* = \underset{x \in \mathcal{D}_x \subset \mathcal{D}_f}{\arg \max} f(x),
+\end{equation}
+
+where $\mathcal{D}_x$ is the feasible set.
+
+{\color{blue} transition to update}
+%In the permutation flowshop scheduling problem, the objective function is defined \eqref{eq:objective_function} and we can observe that finding the maximum of this function is really hard because this function is not linear, nor convex. Therefore, as it is a NP-hard problem, we cannot use algorithms to solve this problem. Instead, we will use several methods to look for the best solution possible in the feasible set. We will now present these approaches: the random search \ref{sec:random_search_theoretical_reviews}, the greedy algorithm \ref{sec:greedy_theoretical_reviews}, the evolutionary algorithms \ref{sec:evolutionary_algorithms_theoretical_reviews} and the simulated annealing approach \ref{sec:simulated_annealing_theoretical_reviews}.
+
+\subsection{Differential Evolution}\label{sec:DE_theory}
+
+\subsubsection{Principle}\label{sec:DE_theory_principle}
+
+\emph{Differential Evolution} (DE) is a \emph{metaheuristics}, a particular case of \emph{evolutionary algorithm}, design to solve an optimization problem by improving step-by-step a candidate solution in regards to a specific measure (fitness function). This method was originally proposed by R. Storn and K. Price in 1997 (see \cite{storn1997differential}).
+
+At origin, this method was designed for \emph{topological} problem, using therefore a continuous search space. However, there are some alterative version of DE to handle \emph{combinatorial} problem such as binary problem (\ref{sec:bde}).
+
+As the DE is based on EA, it is based on classical crossover and on typical search mechanisms for continuous search spaces.
+
+Let's now present in details the main mechanism for DE as presented in \cite{przewozniczek_de}. The main loop starts by initializing a population. Then, until a specific stop condition is met, we will for each individual \texttt{ind}:
+
+\begin{itemize}
+    \item create a candidate solution \texttt{indCand};
+    \item if the fitness of \texttt{ind} is less or equal than the fitness of \texttt{indCand}, we replace the \texttt{ind} by \texttt{indCand}.
+\end{itemize}
+
+We now need to precise how to create the candidate individual. In order to do that, we need to randomly pick 3 individuals of the population: \texttt{indBase}, \texttt{ind0} and \texttt{ind1}. Then, we will create the candidate individual if all four individuals differs.
+
+In that case, for each gene, we will create a \texttt{mutantInd} with the following relation:
+
+\begin{equation}
+    \small \texttt{mutantInd}[\texttt{geneOff}] \leftarrow \texttt{indBase}[\texttt{geneOff}] + F \cdot \left(\texttt{ind0}[\texttt{geneOff}] - \texttt{ind1}[\texttt{geneOff}]\right),
+\end{equation}
+
+where $F$ represents the \emph{scaling factor} or the \emph{differential weight}, which is one of the core parameters of that method. Usually, $F\in \lbrack 0,2\rbrack$ as describe in {\color{blue}METTRE REF}. In order to create finally the offspring, we need to use another parameter $P_x$ the \emph{crossover probability}.
+
+In order to generate each gene of the new individual, we will randomly choose a real number between $0$ and $1$ and there is now two cases:
+
+\begin{itemize}
+    \item if that number is less that the \emph{crossover probability}, we define the gene as as the mutant gene previously generated;
+    \item otherwise, the gene is defined by the \texttt{ind}.
+\end{itemize}
+
+To put it in a nutshell, the candidate solution is generated in a way to preserve the original genotype and to have a mutant part base on crossover on the difference of the two others individuals as represented in \figref{}. In that way, DE uses both properties of local search and \emph{Genetic Algorithms} (GA).
+
+{\color{blue}METTRE LA FIGURE ICI}
+
+Finally, there is multiple way to define the base vector: we can for instance choose randomly the individual or the best one. We can also apply the same scheme with more than two individuals to make the mutation. Then, we can also define several crossover types such as the binomial (bin) and exponential (exp). This leads us to the DE-naming convention as follows: \textbf{DE $x$/$y$/$z$}, where $x$ designate the way of choosing the base vector, $y$ the number of different vectors used by mutation and $z$ the crossover type, where a vector is the difference of two different individuals.
+
+If we use multiple vectors, we need to define the same amount of scaling factors $F_i$ where $i$ is the for the $i-$th vector. For instance, if we consider DE best/2/bin, we use two different vectors between four individuals $X_1, X_2,X_3$ and $X_4$. As we use the best method to select the base individual, the mutated solution would be:
+
+\begin{equation*}
+    X = X_{\text{best}} + F_1 \cdot (X_1 - X_2) + F_2\cdot (X_3 - X_4)
+\end{equation*}
+
+\subsubsection{Variants to solve binary problem}\label{sec:bde}
+
+\subsubsubsection{Binary Differential Evolution (BDE)}
+
+As detailed in \ref{sec:general_overview}, the feature selection problem is a \emph{combinatorial} problem so it is not living in a continuous search space. Therefore, the usual DE cannot be applied to our problem. However, we can adapt the DE to map a binary problem.
+
+In order to transform the continuous value to probability, we can use \emph{transfer function} or \emph{squashing function}. A well-known example of this type of function is the logistic function sigmoid:
+
+\begin{equation}\label{eq:sigmoid}
+    \begin{array}{r|rcl}
+    S: & \mathbb{R} & \to     & \lbrack 0,1\rbrack \\
+       & x          & \mapsto & \frac{1}{1+e^{-x}}
+    \end{array}
+\end{equation}
+
+As $e^{-x}\geq0$ for all real $x$, that $e^{-x} \underset{x\to +\infty}{\longrightarrow} 0$ and $e^{-x} \underset{x\to -\infty}{\longrightarrow} +\infty$, we can easily show that $S(x) \in \lbrack0,1\rbrack$, as illustrated on \figref{sigmoid}. Therefore, $S(x)$ can represent a probability.
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.7\linewidth]{img/sigmoid.png}
+    \caption{\textbf{Illustration of the sigmoid function for $x\in \lbrack -20,20\rbrack$.} We can see how this function transform $x\in \mathbb{R}$ into $S(x) \in \lbrack0,1\rbrack$ (the dotted line are the two horizontal tangent).}
+    \label{fig:sigmoid}
+\end{figure}
+
+In practice, we use the continuous version of the DE and we will get a vector value $x\in \mathbb{R}$. We will then compute $S(x)$ which will represent the probability to get $1$. Once $S(x)$ computed, we will randomly generate a number between $0$ and $1$, noted $p$. If $p<S(x)$, it represents a "$1$". Otherwise, if $p\geq S(x)$, it represents a "$0$".
+
+In that way, we are able to map a continuous value into a binary one. However, we can note that the size of the problem is the same as we don't change the dimension of the problem: if we have $n$ real value, we will have a sequence of $n$ bits.
+
+\subsubsubsection{Angle Modulation Differential Evolution (AMDE)}
+
+Another variant of the DE called "Angle Modulation Differential Evolution" (AMDE) was proposed in 2006 and can deal with binary problem (see \cite{1688535}).
+
+Instead of directly working with a binary sequence, they suggested to use a continuous function to generate this sequence. This is a trigonometry-based function defined as following:
+
+\begin{equation}
+    g(x) = \sin(2\pi(x-a) \times b \times \cos(A))+d, \qquad \text{where } A=2\pi \times c(x-a).
+\end{equation}
+
+In this function, $a$ represents the horizontal shift of the generating function, $b$ the maximum frequency of the composed $\sin$ function, $c$ the frequency of the composed $\cos$ function and $d$ determines the vertical shift of the generating function. The representation of theses coefficients can be illustrated with the \figref{g_x_illustration}.
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=.7\linewidth]{img/g_x_illustration.png}
+    \caption{\textbf{Bit string generating function with default values $a = 0, b =1, c = 1, d = 0$.} Source: \cite{1688535}}
+    \label{fig:g_x_illustration}
+\end{figure}
+
+In order to create a binary sequence of $n$ bits, the algorithm first choose $n$ uniformly spaced $x$ and we compute $g(x)$. If $g(x)>0$, the bit is $1$. If $g(x) \leq 0$, the bit is 0.
+
+In fact, if we want to solve a binary problem with $n$ bits, the AMDE just needs to optimize the four parameters $a,b,c,d$ so it is well-designed to reduce computation time and iterations.
+
+The \myalgref{amde} presents how this is effectively done in a traditional loop of evolution.
+
+\begin{algorithm}
+\caption{AMDE Algorithm}
+\label{alg:amde}
+\begin{algorithmic}
+\State Initalize a population and set control parameter values
+\Repeat
+    \State Select required individuals for reproduction scheme
+    \State Produce an offspring individual
+    \State Evaluate the fitness of the offspring individual by generating bit string and passing to fitness function
+    \If{$F_{AMDE}(offspring) <= F_{AMDE}(parent)$}
+        \State Replace parent individual with offspring
+    \Else
+        \State Retain parent individual
+    \EndIf
+\Until{Stopping condition is met}
+\end{algorithmic}
+\end{algorithm}
+
+\subsection{Simulated Annealing}\label{sec:simulated_annealing_theoretical_reviews}
+
+\subsubsection{Overview}
+
+The \emph{simulated annealing} is based on the annealing's process in metallurgy. In this process, we aim to create a more solid material by alternating slow cooling and heating (annealing) in order to relax the micro-fissure within the material and, thus, going in a more stable form of the material, and therefore minimize the total energy of the material.
+
+Therefore, by analogy, the algorithm's process can be described by : first, we choose a random initial state in the feasible set. This state is characterized by its total energy $E_0$ (which is in fact evaluated by the objective function) and we use the fictive parameter $T$ as for the temperature in the real annealing. At each step, we change slightly the state (in the \emph{neighborhood}) and we get therefore a difference of energy $\Delta E$. If $\Delta E<0$, then the system has less energy so is more stable so we get that change. Otherwise, if $\Delta E > 0$, then the neighbor is worse but we still accept it with a probability $\exp\left(-\frac{\Delta E}{T}\right)$. Then, we continue to iterate until we reach the maximal number of iterations or if we obtain a pretty good solution.
+
+We now need to describe how the temperature will change, we can set it piecewise constant or following a law of evolution. The most common is the geometric one \cite{wiki_recuit_simule_fr}, we can therefore write:
+
+\begin{equation}\label{eq:rec_sa}
+    T_{i+1} = \lambda T_i,
+\end{equation}
+
+where $\lambda < 1$ (otherwise it is constant) and we usually take $\lambda = 0,99$ \cite{kirkpatrick1983optimization}.
+
+This method has the advantage that, under some hypothesis, we can prove that this process will converge in probability \cite{lacroix2001markov}. But the huge disadvantage of this approach is that it is very hard to determine the good parameters to fit the model.
+
+In fact, the temperature has a huge impact: with high temperature, the system can easily move in the feasible set because $\exp\left(-\frac{\Delta E}{T}\right)$ is close to $1$. However, with low temperature, the changes that decrease the energy of the system are accepted but others are also accepted which allow us not to be blocked inside a local minimum.
+
+\subsubsection{Adaptation for the feature selection problem}
+
+The part of the simulated annealing that depends on the considered problem is the generation of the neighbourhood. For a permutation method, we can implement a swap approach but for the feature selection, as it is a binary problem, we can just do a bit flip.
+\begin{algorithm}[H]
+\caption{Simulated Annealing for Feature Selection}
+\label{alg:sa_fs}
+\begin{algorithmic}[1]
+\Require $N$ (number of features), $eval_{\max}$ (maximum evaluations), $T_0$ (initial temperature), $\alpha$ (cooling rate)
+\Ensure $g$ (best solution found)
+
+\State $s \gets \text{Random binary vector of size } N$ \textit{// Current solution}
+\State $\text{Evaluate}(s)$
+\State $g \gets s$ \textit{// Global best solution}
+\State $T \gets T_0$ \textit{// Set up initial temperature}
+
+\For{$i \gets 1$ \textbf{to} $eval_{\max} - 1$}
+    \vspace{0.1cm}
+    \State \textit{// Generate neighbor (Bit Flip)}
+    \State $s_n \gets \text{Copy}(s)$
+    \State $idx \gets \text{RandomInteger}(0, N - 1)$
+    \State $s_n[idx] \gets 1 - s_n[idx]$
+    \State $\text{Evaluate}(s_n)$
+    
+    \vspace{0.1cm}
+    \State $\Delta f \gets f(s_n) - f(s)$ \textit{// Compute fitness difference}
+    
+    \vspace{0.1cm}
+    \State \textit{// Acceptance criterion}
+    \If{$\Delta f < 0$} \textit{// The neighbor is better}
+        \State $s \gets s_n$
+        \vspace{0.1cm}
+        \State \textit{// Update global best}
+        \If{$f(s_n) < f(g)$}
+            \State $g \gets \text{Copy}(s_n)$
+        \EndIf
+    \Else \textit{// The neighbor is worse, accept with a probability}
+        \State $p \gets \exp(-\Delta f / T)$
+        \If{$\text{Random}(0, 1) < p$}
+            \State $s \gets s_n$
+        \EndIf
+    \EndIf
+    
+    \vspace{0.1cm}
+    \State \textit{// Cooling down}
+    \State $T \gets T \times \alpha$
+    
+    \vspace{0.1cm}
+    \State \textit{// Prevent division by zero / machine precision issue}
+    \If{$T < 10^{-10}$}
+        \State $T \gets 10^{-10}$
+    \EndIf
+\EndFor
+
+\State \Return $g$
+\end{algorithmic}
+\end{algorithm}
+
+\subsection{Particle Swarm Optimization}
+
+\subsubsection{Principle}
+
+As its name suggests, the \emph{Particle Swarm Optimization} (PSO) was inspired by animal swarms. In this swarm, we have a leader that provide the genereal direction toward each bird will follow. However, each bird is free to make its own decisions. Initially, this method was proposed for continuous search spaces and is very relevant to deal with noised problem or multiple optima \cite{kennedy1995particle}.
+
+Each bird of the swarm can be characterized by its position $x_{i,j}(t)$ where $i$ is the number of the bird, $j$ the dimension, $t$ the iteration illustrated by the time and its speed and move direction $v_{i,j}(t)$. The position of the next iteration is the sum of the previous position and the move direction (see \cite{przewozniczek_pso}).
+
+\begin{equation}\label{eq:position_pso}
+    x_{i,j}(t+1)=x_{i,j}(t) + v_{i,j}(t+1)
+\end{equation}
+
+We now to study how this speed $v_{i,j}(t)$ evolve throughout iterations. A common description is detailed in \cite{vandenbergh2006study} where we have
+
+\begin{equation}\label{eq:velocity_pso}
+    v_{i,j}(t+1) = \lambda v_{i,j}(t) + c_pr_p \left(x_{i,j}^{\text{best}} - x_{i,j}(t)\right) + c_g r_g \left(g_{j}^{\text{best}} - x_{i,j}(t)\right).
+\end{equation}
+
+In this equation, $\lambda$ is an inertia coefficient, $c_p$ and $c_g$ are coefficient between $0$ and $2$, $r_p$ and $r_g$ are two random numbers between $0$ and $1$, $x_{i,j}^{\text{best}}$ is the $j-$th dimension of the best solution of the $i-$th bird and, in the same way, $g_{j}^{\text{best}}$ is the $j-$th dimension of the best solution of the whole swarm. In fact, $c_pr_p$ represent the cognitive component and $c_g r_g$ the social component. {\color{blue} TO DEVELOPP}
+
+The value of these coefficients are discussed in \cite{vandenbergh2006study}. In fact, we can represent $\lambda$ regarding $\phi_1+\phi_2$, where $\phi_1=c_p r_p$ and $\phi_2=c_g r_g$.
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.7\linewidth]{Main_Project/img/pso_coefficients_values.png}
+    \caption{\textbf{The black triangle to the bottom right represents the values for which the particle strictly diverges, i.e. $\max\left(\norm{\lambda_1}, \norm{\lambda_2}\right) > 1$. This is the region for which $w < 0.5(\phi_1 + \phi_2)-1$. The lighter regions represent the magnitude of $\max\left(\norm{\lambda_1}, \norm{\lambda_2}\right)$, with white representing magnitude $1$. The darker regions (outside of the divergent region) represent values leading to more rapid convergence.} Source: \cite{vandenbergh2006study}}
+    \label{fig:placeholder}
+\end{figure}
+
+\subsubsection{Variants to solve binary problem}\label{sec:binary_PSO}
+
+\subsubsubsection{Binary Particle Swarm Optimization}
+
+\paragraph{BPSO by Kennedy and Eberhart} In order to handle binary search space, Kennedy and Eberhart in \cite{kennedy1997discrete} had to redefine the meaning of the velocity. In the continuous search spaces, the velocity represents the physical movement of bird but, in the binary search spaces, it represents the probability that a specific component of the binary sequence takes the value "$1$".
+
+The velocity update equation \eqref{eq:velocity_pso} remains structurally identical to the continuous version. To map this continuous velocity $v_{i,j}(t+1)$ to a valid probability range $[0, 1]$, a logistic sigmoid function is applied (see \eqref{eq:sigmoid} and \figref{sigmoid}):
+
+\begin{equation}
+    S\left(v_{i,j}(t+1)\right) = \frac{1}{1 + e^{-v_{i,j}(t+1)}}
+\end{equation}
+
+Similarly to the BDE, the position update rule is then replaced by a probabilistic decision based on a random number $r_{i,j}$ drawn from a uniform distribution in $[0, 1]$:
+
+\begin{equation}\label{eq:decision_BPSO}
+    x_{i,j}(t+1) = 
+    \begin{cases} 
+        1 & \text{if } r_{i,j} < S(v_{i,j}(t+1)) \\
+        0 & \text{otherwise}
+    \end{cases}
+\end{equation}
+
+To prevent the search process from stagnating, it is crucial to avoid probabilities becoming exactly $0$ or $1$. Therefore, it is a common practice introduced in the original paper to limit the velocity within a range $[-V_{\max}, V_{\max}]$. A typical threshold is $V_{\max} = 4$, which bounds the maximum probability of changing a bit's state between approximately $0.018$ and $0.982$.
+
+\paragraph{Main problems with binary PSO}
+
+According to \cite{4433821}, there are two main problems and concerns about binary
+PSO: parameters and memory.
+
+While the BPSO of Kennedy and Eberhart is commonly implemented, some major differences were observed in the core mechanism of PSO (for continuous search space) and BPSO (for binary search space).
+
+For instance, in the PSO, if there is no velocity ($\forall t \in \mathbb{N}, v_{i,j}(t)=0$), then there is no movement using relation \eqref{eq:position_pso} ($\forall t \in \mathbb{N}, x_{i,j}(t+1)=x_{i,j}(t)$). Therefore, in PSO, a zero velocity implies that the bird is stationary. However, in BPSO, if we have $v=0$, then we get a probability to get "$1$" of
+
+\begin{equation*}
+    S(0)=\frac{1}{1+e^{-0}} = \frac{1}{2} = 0.5.
+\end{equation*}
+
+Hence, the bird has $50\%$ chance to take the value "$1$" (or "$0$" in fact). And that is actually a core paradox between these two implementations: for the PSO, $v=0$ implies no change and for the BPSO $v=0$ implies a maximum randomness and changes.
+
+Furthermore, using \eqref{eq:decision_BPSO}, we can observe that the next value for the bit is
+almost independent of the current value of that bit and the value is solely updated using the velocity vector. But in standard continuous PSO, the update rule for the position uses current position and the velocity vector (see \eqref{eq:velocity_pso}).
+
+\paragraph{NBPSO by Khanesar, Teshnehlab, and Shoorehdeli}
+
+In order to resolve the inconsistencies between PSO and BPSO, Khanesar, Teshnehlab, and Shoorehdeli proposed a \emph{Novel Binary Particle Swar Optimization} (NBPSO) in 2007 (see \cite{4433821}). The core contribution of their approach is a complete redefinition of the velocity's meaning to align it with the continuous version.
+
+In NBPSO, the velocity of a particle is defined as the \emph{probability of changing its state} from its previous value to its complement, rather than the absolute probability of the bit being $1$. This redefinition restores the original physical meaning of velocity as a "rate of change". Consequently, if a particle's velocity drops to zero in NBPSO, its probability of changing state is zero. The particle remains stationary, as it was the case with the continuous PSO.
+
+To implement this dynamic, Khanesar et al. introduced two separate velocity vectors for each particle:
+\begin{itemize}
+    \item $v_{i,j}^1$ which is the probability that the $j$-th bit changes to $1$ (applied if the current bit is $0$) ;
+    \item $v_{i,j}^0$ which is the probability that the $j$-th bit changes to $0$ (applied if the current bit is $1$).
+\end{itemize}
+
+These velocities are updated based on whether the particle's current bit matches its personal best ($x_{i,j}^{\text{best}}$) or the global best ($g_j^{\text{best}}$). If the current bit differs from these best-known positions, the respective velocity to flip toward that better state is increased using the standard cognitive and social components.
+
+By interpreting velocity as a mutation rate rather than an absolute state probability, the NBPSO allows the standard PSO parameters (such as the inertia weight) to behave exactly as they do in the continuous domain. This leads to more stable exploitation of the search space and prevents the purely random search behavior associated with low velocities in the original BPSO.
+
+\subsubsubsection{Uprade NBPSO}
+
+To come :)
+
+\subsection{NSGA}
+
+\subsection{Heavy Model}\label{sec:heavy_model}
+
+description of the heavy model used and why
+
+\subsection{Light model}\label{sec:ligh_model}
+
+description of the light model used and why
+
+\subsection{Comparison between parameters}\label{sec:friedman}
+
+\subsubsection{Friedman test}
+
+To decide which set of parameters performs best, we cannot simply pick the highest mean accuracy because, after getting results from the experiments, we observe that the differences are very small ($\sim 1\%$) and the ranking varies across datasets and models.
+
+Therefore, we use the non-parametric procedure recommended for comparing several configurations over multiple datasets~\cite{demsar2006statistical}. The $k$ different tested configurations are treated as the \emph{treatments} and each (dataset, model) pair is treated as an independent \emph{block}; with four datasets and two evaluators (SVM and kNN) this leads to $N=8$ blocks.
+
+Within every block, the $k$ configurations are ranked by their mean accuracy over the ten runs (rank $1$ = best, average ranks in case of ties).
+
+Let $R_j$ denote the average rank of ratio $j$ over the $N$ blocks. The Friedman statistic is
+
+\begin{equation}\label{eq:friedman}
+    \chi_F^2 = \frac{12N}{k(k+1)}\left[\sum_{j=1}^{k} R_j^2 - \frac{k(k+1)^2}{4}\right],
+\end{equation}
+
+computed with the usual correction for tied ranks.
+
+If the $p-$value of this tests is less than $0.05$, it means that the null hypothesis is rejected and, thus, that there is indeed a significant difference. In that case, we will then proceed with the Post-Hoc test to determine which configuration is indeed the best.
+
+Otherwise, if the $p-$value is greater than $0.05$, there is no significant difference between the different configurations.
+
+Because $N$ is small, we also report the Iman--Davenport statistic, which is less conservative and follows an $F$ distribution~\cite{iman1980approximations}:
+
+\begin{equation}\label{eq:iman_davenport}
+    F_F = \frac{(N-1)\,\chi_F^2}{N(k-1)-\chi_F^2} \sim F\big(k-1,\,(k-1)(N-1)\big).
+\end{equation}
+
+\subsubsection{Nemenyi Post-Hoc test}
+When the null hypothesis (all ratios equivalent) is rejected, we apply the Nemenyi post-hoc test: two ratios are significantly different if their average ranks differ by at least the critical difference
+
+\begin{equation}\label{eq:nemenyi_cd}
+    CD = q_\alpha \sqrt{\frac{k(k+1)}{6N}},
+\end{equation}
+
+where $q_\alpha$ is the critical value of the Studentized range statistic ($q_{0.05}=2.569$ for $k=4$).
+
+\section{Implementation and protocol}\label{sec:implementation_protocol}
+
+
+\subsection{Description of the protocol}
+
+This section will describe the numerical protocol that we apply to compare efficiently and in a fair play way all our methods to solve the PFSP problem. First, we will describe the environment and the hardware used \ref{sec:hardware_environment}. Then, we will precise the stop condition that we used \ref{sec:stop_condition} and how we measured computation time \ref{sec:computation_time}. 
+
+\subsubsection{Hardware description and environment}\label{sec:hardware_environment}
+
+\paragraph{Computer used to run the tests} 
+
+All numerical experiments were executed locally on a single machine to ensure a fair and consistent evaluation environment. The hardware configuration of the computer used for these tests is detailed as follows:
+
+\begin{table}[H]
+    \centering
+    \renewcommand{\arraystretch}{1.5}
+    \begin{tabularx}{\textwidth}{|>{\centering\arraybackslash}p{3.5cm}|X|}
+        \hline 
+        \textbf{Component} & \textbf{Specifications} \\ \hline
+
+        \textbf{Processor (CPU)} & AMD\textsuperscript{\tiny\textregistered} Ryzen\textsuperscript{\tiny\texttrademark} 7 9800X3D @ 5.25 GHz (Base: 4.7 GHz). 8 Physical Cores, 16 Logical Processors. 96 MB L3 Cache. \\ \hdashline
+
+        \textbf{Memory (RAM)} & 64GB DDR5 SDRAM @ 3000 MHz, Dual-Channel \\ \hdashline
+
+        \textbf{Operating System} & Windows 11 \\ 
+        \hline
+    \end{tabularx}
+    \caption{\textbf{Hardware specifications of the machine used for computation.}}
+    \label{tab:hardware_specs}
+\end{table}
+
+Furthermore, to maintain the integrity of the computation time measurements, background tasks were minimized during the execution of the scripts.
+
+\paragraph{Environment and resources allocation}
+
+\textsc{Ubuntu} allows you to allocate a certain number of cores to a specific task, that's why we allocate a specific core for every experiment run. To do so, we use the following:
+
+\begin{lstlisting}[style=Bash, caption={Allocating core 1 to run the experiment}, captionpos=b]
+# force the script to run only on core 1
+taskset -c 1 python app.main
+
+\end{lstlisting}
+
+We also control the number of core use by Python by adding the code \mylistref{core_python} in our \texttt{main} file.
+
+\begin{python}[caption={Control the number of cores used in the \texttt{main} file of our application},  label={lst:core_python}]
+import os
+os.environ["OMP_NUM_THREADS"] = "1" # OpenMP
+os.environ["OPENBLAS_NUM_THREADS"] = "1" # OpenBLAS
+os.environ["MKL_NUM_THREADS"] = "1" # MKL
+os.environ["VECLIB_MAXIMUM_THREADS"] = "1" # Accelerate
+os.environ["NUMEXPR_NUM_THREADS"] = "1" # NumExpr
+\end{python}
+
+\subsubsection{Stop condition}\label{sec:stop_condition}
+
+To ensure a strictly fair and unbiased comparison between the different stochastic algorithms (Random Search, Evolutionary Algorithm, and Simulated Annealing), we established a common computational budget rather than relying on a time-based limit. The stop condition was strictly defined by a maximum Number of Function Evaluations (NFE) set to 10 000. 
+ 
+The only exception to this rule is the Greedy algorithm. Being a deterministic constructive heuristic rather than a stochastic search method, it does not iterate over complete solutions. Instead, it naturally terminates as soon as the single optimal local schedule is fully built, resulting in an NFE of exactly 1.
+
+\subsubsection{Measuring computation time}\label{sec:computation_time}
+
+It is also useful to accurately measure the real-world execution time in order to evaluate the practical efficiency of each algorithm.
+
+To measure the elapsed time in our Python implementation, we use the \texttt{timeit} module instead of the most common \texttt{time} as \texttt{timeit} is much more accurate \cite{so_time_vs_timeit_2013}. As widely documented in Python benchmarking standards, \texttt{time.time()} measures the real-world wall-clock time and is susceptible to system clock updates, which can lead to inaccuracies during very short executions.
+
+\subsection{Main structure}
+
+According to the pseudo-code presented in \ref{sec:theoretical_review}, we have implemented these methods using the Object-oriented programming and the structure is therefore represented through a class diagram \figref{class_diagram}.
+
+All the code and the files of the project is available here:
+
+\href{https://github.com/MaximeLuce/Feature-Selection-solving-the-problem-and-application-to-signal-processing}{\small https://github.com/MaximeLuce/Feature-Selection-solving-the-problem-and-application-to-signal-processing}.
+
+{\color{red} UPDATE THE CLASS DIAGRAMM}
+
+\begin{landscape}
+    \begin{figure}[H]
+        \centering
+        \includegraphics[width=.85\linewidth]{Zero_Project/structure/OM_0task_classes.png}
+        \caption{\textbf{Class diagram of the application implemented.}}
+        \label{fig:class_diagram}
+\end{figure}
+\end{landscape}
+
+
+
+\subsection{Unit tests}
+
+{\color{red} TO MODIFY WITH ACTUAL UNIT TESTS}
+Before running all numerical experiments, we implemented unit tests in order to verify critical method or method of algorithm such as the example \mylistref{unit_test_evaluation_function}: testing with example in section \ref{sec:theoretical_review} of OX, PMX, CX, swap, inversion, tournament and problem evaluation. 
+
+\begin{python}[caption={Example of unit test for the evaluation function of a given problem},  label={lst:unit_test_evaluation_function}]
+    from app.Problem.Problem import Problem
+
+    # TEST
+    
+    if __name__ == "__main__":
+        M = [[30, 29, 19, 50],
+         [39, 69, 6, 73],
+         [3, 86, 58, 60],
+         [72, 74, 51, 15],
+         [24, 47, 22, 90]]
+        
+        p = Problem(4,5,M)
+    
+        print("--- Display test ---")
+        print(p)
+    
+        print("--- Test on known sequence ---")
+        result = p.evaluate([0, 2, 3, 1])
+        if result == 1170:
+            print(f'Unit test successful, for the sequence [1, 3, 4, 2], we get {result}')
+        else:
+            print(f"Unit test failed, for the sequence [1, 3, 4, 2], we get {result}'")
+\end{python}
+
+
+
+
+\section{Finding the optimal parameters}\label{sec:finding_optimal_parameters}
+
+As described in \tableref{methods_objectives}, we will use four methods that require parameters : the Differential Evolution, the Simulated Annealing and the Particle Swarm Optimization. To compare all these methods, we first need to find the optimal parameters.
+
+First, we present all the cases used to determine the best set of parameters for these methods \ref{sec:description_cases}. Then, we run and analyze experiment for each case \ref{sec:running_experiment} and we summarize all the best set of parameters found in \ref{sec:summary_parameters}.
+
+\subsection{Description of the different cases}\label{sec:description_cases}
+
+We will first present the cases in order to determine the best set of parameters for the differential evolution \ref{sec:cases_de}: both binary differential evolution \ref{sec:cases_bde} and angle module differential evolution \ref{sec:cases_amde}.
+
+Then, we will present the cases for the Simulated Annealing including initial temperature and cooling rate parameters \ref{sec:cases_sa}.
+
+Finally, we will describe the different cases used for the novel binary swarm optimization \ref{sec:cases_nbpso}.
+
+\subsubsection{Differential Evolution}\label{sec:cases_de}
+
+\paragraph{Overview of parameters}
+
+The Differential Evolution relies on five main parameters, as described in section \ref{sec:DE_theory_principle}: the strategy to choose the base vector, the population size ($NP$), the number of generations ($G$), the mutation scaling factor ($F$), and the crossover rate ($CR$).
+
+However, it exists other parameters such as the type of crossover. For our analysis, we fixe this parameter and we use a binomial \texttt{bin} crossover.
+
+Furthermore, for the Binary Differential Evolution, we fixed the transfer function by using sigmoid function (\figref{sigmoid}) and, therefore, we don't take into account in our study the impact of different type of transfer function.
+
+
+\subsubsubsection{Binary Differential Evolution (BDE)}\label{sec:cases_bde}
+
+\paragraph{Strategy to choose the base vector}
+The Differential Evolution algorithm is heavily defined by its mutation strategy, with the naming convention described in section \ref{sec:DE_theory_principle}. The choice of the base vector (random vs. best) and the number of difference vectors ($1$ or $2$) dictates the balance between exploration and exploitation. 
+
+Because the others parameters are highly dependent on the chosen strategy, we must determine the best mutation scheme first (\tableref{Cases_Determine_BDE_Strategy}). To do so, we use standard literature values for the control parameters: $NP=50$, $G=200$ ($10\,000$ evaluations), $F=0.5$, and $CR=0.5$. Note that for strategies involving two difference vectors (\textit{rand/2} and \textit{best/2}), we use a single scaling factor $F$ for both difference operations to constrain the parameter space.
+
+\begin{table}[H]
+    \centering
+    \renewcommand{\arraystretch}{1.5}
+    \begin{tabular}{|c|c|c|c|c|c|c|}
+        \hline 
+        \textbf{Case n°} & \textbf{Mutation Strategy} & $NP$ & $G$ & $F$ & $CR$ & \textbf{Run per algo} \\ \hline
+
+        \textbf{1} & rand/1 & 50 & 200 & 0.5 & 0.5 & 10 \\ \hdashline
+        \textbf{2} & best/1 & 50 & 200 & 0.5 & 0.5 & 10 \\ \hdashline
+        \textbf{3} & current-to-rand/1 & 50 & 200 & 0.5 & 0.5 & 10 \\ \hdashline
+        \textbf{4} & current-to-best/1 & 50 & 200 & 0.5 & 0.5 & 10 \\ \hdashline
+        \textbf{5} & rand/2 & 50 & 200 & 0.5 & 0.5 & 10 \\ \hdashline
+        \textbf{6} & best/2 & 50 & 200 & 0.5 & 0.5 & 10 \\ 
+        \hline
+    \end{tabular}
+    \caption{\textbf{Description of the parameters used to determine the best mutation strategy for BDE.}}
+    \label{tab:Cases_Determine_BDE_Strategy}
+\end{table}
+
+\paragraph{Population/generation ratio}
+
+Let us assume that the best performing strategy is noted $Strat^*$. We can now tune the population size ($NP$) and number of generations ($G$) specifically for this strategy's behavior (\tableref{Cases_Determine_BDE_Pop_Gen}).
+
+To ensure a fair comparison, the total number of fitness evaluations ($NP \times G$) is kept constant (e.g., $10\,000$). We use standard default values for $F$ (0.5) and $CR$ (0.5) during this first step.
+
+\begin{table}[H]
+    \centering
+    \renewcommand{\arraystretch}{1.5}
+    \begin{tabular}{|c|c|c|c|c|c|c|}
+        \hline 
+        \textbf{Case n°} & \textbf{Strategy} & \textbf{Population ($NP$)} & \textbf{Generations ($G$)} & $F$ & $CR$ & \textbf{Run per algo} \\ \hline
+
+        \textbf{7} & $Strat^*$ & 100 & 100 & 0.5 & 0.5 & 10 \\ \hdashline
+        \textbf{8} & $Strat^*$ & 50 & 200 & 0.5 & 0.5 & 10 \\ \hdashline
+        \textbf{9} & $Strat^*$ &20 & 500 & 0.5 & 0.5 & 10 \\ 
+        \hline
+    \end{tabular}
+    \caption{\textbf{Description of the parameters used to determine the best population/generation ratio for BDE.}}
+    \label{tab:Cases_Determine_BDE_Pop_Gen}
+\end{table}
+
+\paragraph{Scaling factor and crossover probability}
+
+Let us assume we obtained the best ratio, denoted by $NP^*$ and $G^*$. We then focus on the mutation scaling factor $F$ and the crossover probability $CR$ (\tableref{Cases_Determine_BDE_F_CR}). As these two parameters are dependent, we used a Grided search to explore the combination of both $F$ and $CR$, instead of a single tuning.
+
+\begin{table}[H]
+    \centering
+    \renewcommand{\arraystretch}{1.5}
+    \begin{tabular}{|c|c|c|c|c|c|c|}
+        \hline 
+        \textbf{Case n°} & \textbf{Strategy} & \textbf{Population ($NP$)} & \textbf{Generations ($G$)} & $F$ & $CR$ & \textbf{Run per algo} \\ \hline
+
+        \textbf{10} & $Strat^*$ & $NP^*$ & $G^*$ & 0.3 & 0.1 & 10 \\ \hdashline
+        \textbf{11} & $Strat^*$ & $NP^*$ & $G^*$ & 0.3 & 0.5 & 10 \\ \hdashline
+        \textbf{12} & $Strat^*$ & $NP^*$ & $G^*$ & 0.3 & 0.7 & 10 \\ \hdashline
+        \textbf{13} & $Strat^*$ & $NP^*$ & $G^*$ & 0.3 & 0.9 & 10 \\ \hdashline
+        \textbf{14} & $Strat^*$ & $NP^*$ & $G^*$ & 0.5 & 0.1 & 10 \\ \hdashline
+        \textbf{15} & $Strat^*$ & $NP^*$ & $G^*$ & 0.5 & 0.5 & 10 \\ \hdashline
+        \textbf{16} & $Strat^*$ & $NP^*$ & $G^*$ & 0.5 & 0.7 & 10 \\ \hdashline
+        \textbf{17} & $Strat^*$ & $NP^*$ & $G^*$ & 0.5 & 0.9 & 10 \\ \hdashline
+        \textbf{18} & $Strat^*$ & $NP^*$ & $G^*$ & 0.9 & 0.1 & 10 \\ \hdashline
+        \textbf{19} & $Strat^*$ & $NP^*$ & $G^*$ & 0.9 & 0.5 & 10 \\ \hdashline
+        \textbf{20} & $Strat^*$ & $NP^*$ & $G^*$ & 0.9 & 0.7 & 10 \\ \hdashline
+        \textbf{21} & $Strat^*$ & $NP^*$ & $G^*$ & 0.9 & 0.9 & 10 \\ 
+        \hline
+    \end{tabular}
+    \caption{\textbf{Description of the parameters used to determine the best $(F, CR)$ combination for BDE.} The grid favors a finer sampling of $CR$, which is known to be the most sensitive control parameter of DE. Note that Case 15 ($F=0.5$, $CR=0.5$) corresponds to the winning configuration of \tableref{Cases_Determine_BDE_Pop_Gen}: its results are reused without re-running the algorithm.}
+    \label{tab:Cases_Determine_BDE_F_CR}
+\end{table}
+
+\subsubsubsection{Angle Modulation Differential Evolution (AMDE)}\label{sec:cases_amde}
+
+\paragraph{Overview of parameters} The Angle Modulation approach utilizes a standard continuous Differential Evolution algorithm to optimize a 4-dimensional continuous space (the 4 coefficients $a, b, c, d$ of the trigonometric generating function), regardless of the actual number of features in the dataset.
+
+Because the search space is strictly limited to 4 dimensions, the AMDE requires different parameter tuning than the BDE, especially concerning the population size which can be significantly smaller. We apply the same sequential methodology to find its optimal parameters: $Strat^{**}$, $NP^{**}, G^{**}, F^{**}$, and $CR^{**}$.
+
+{\color{blue} bornes d'initialisation des coefficients dans [-1;1] ou [-2;2]}
+
+\paragraph{Strategy to choose the base vector}
+
+First, we study the impact of the strategy to choose the base vector on the performance (\tableref{Cases_Determine_AMDE_Strategy}).
+
+\begin{table}[H]
+    \centering
+    \renewcommand{\arraystretch}{1.5}
+    \begin{tabular}{|c|c|c|c|c|c|c|}
+        \hline 
+        \textbf{Case n°} & \textbf{Mutation Strategy} & $NP$ & $G$ & $F$ & $CR$ & \textbf{Run per algo} \\ \hline
+
+        \textbf{22} & rand/1 & 50 & 200 & 0.5 & 0.5 & 10 \\ \hdashline
+        \textbf{23} & best/1 & 50 & 200 & 0.5 & 0.5 & 10 \\ \hdashline
+        \textbf{24} & current-to-rand/1 & 50 & 200 & 0.5 & 0.5 & 10 \\ \hdashline
+        \textbf{25} & current-to-best/1 & 50 & 200 & 0.5 & 0.5 & 10 \\ \hdashline
+        \textbf{26} & rand/2 & 50 & 200 & 0.5 & 0.5 & 10 \\ \hdashline
+        \textbf{27} & best/2 & 50 & 200 & 0.5 & 0.5 & 10 \\ 
+        \hline
+    \end{tabular}
+    \caption{\textbf{Description of the parameters used to determine the best mutation strategy for AMDE.}}
+    \label{tab:Cases_Determine_AMDE_Strategy}
+\end{table}
+
+\paragraph{Population/Generation ratio}
+
+Then, we investigate the Population/Generation ratio tailored for a low-dimensional continuous space (\tableref{Cases_Determine_AMDE_Pop_Gen}), keeping the evaluation budget equal to the BDE for fairness.
+
+\begin{table}[H]
+    \centering
+    \renewcommand{\arraystretch}{1.5}
+    \begin{tabular}{|c|c|c|c|c|c|c|}
+        \hline 
+        \textbf{Case n°} & \textbf{Strategy} &\textbf{Population ($NP$)} & \textbf{Generations ($G$)} & $F$ & $CR$ & \textbf{Run per algo} \\ \hline
+
+        \textbf{28} & $Strat^{**}$ & 50 & 200 & 0.5 & 0.5 & 10 \\ \hdashline
+        \textbf{29} & $Strat^{**}$ & 20 & 500 & 0.5 & 0.5 & 10 \\ \hdashline
+        \textbf{30} & $Strat^{**}$ & 10 & 1000 & 0.5 & 0.5 & 10 \\ 
+        \hline
+    \end{tabular}
+    \caption{\textbf{Description of the parameters used to determine the best population/generation ratio for AMDE.}}
+    \label{tab:Cases_Determine_AMDE_Pop_Gen}
+\end{table}
+
+\paragraph{Scaling factor and crossover probabiliy}
+
+Using the optimal values $NP^{**}$ and $G^{**}$, we tune the mutation scaling factor $F$ together with the crossover probability $CR$ (\tableref{Cases_Determine_AMDE_F_CR}) for the same reason as for Binary Differential Evolution. 
+
+\begin{table}[H]
+    \centering
+    \renewcommand{\arraystretch}{1.5}
+    \begin{tabular}{|c|c|c|c|c|c|c|}
+        \hline 
+        \textbf{Case n°} & \textbf{Strategy} & \textbf{Population ($NP$)} & \textbf{Generations ($G$)} & $F$ & $CR$ & \textbf{Run per algo} \\ \hline
+
+        \textbf{31} & $Strat^{**}$ & $NP^{**}$ & $G^{**}$ & 0.3 & 0.1 & 10 \\ \hdashline
+        \textbf{32} & $Strat^{**}$ & $NP^{**}$ & $G^{**}$ & 0.3 & 0.5 & 10 \\ \hdashline
+        \textbf{33} & $Strat^{**}$ & $NP^{**}$ & $G^{**}$ & 0.3 & 0.9 & 10 \\ \hdashline
+        \textbf{34} & $Strat^{**}$ & $NP^{**}$ & $G^{**}$ & 0.3 & 1.0 & 10 \\ \hdashline
+        \textbf{35} & $Strat^{**}$ & $NP^{**}$ & $G^{**}$ & 0.5 & 0.1 & 10 \\ \hdashline
+        \textbf{36} & $Strat^{**}$ & $NP^{**}$ & $G^{**}$ & 0.5 & 0.5 & 10 \\ \hdashline
+        \textbf{37} & $Strat^{**}$ & $NP^{**}$ & $G^{**}$ & 0.5 & 0.9 & 10 \\ \hdashline
+        \textbf{38} & $Strat^{**}$ & $NP^{**}$ & $G^{**}$ & 0.5 & 1.0 & 10 \\ \hdashline
+        \textbf{39} & $Strat^{**}$ & $NP^{**}$ & $G^{**}$ & 0.9 & 0.1 & 10 \\ \hdashline
+        \textbf{40} & $Strat^{**}$ & $NP^{**}$ & $G^{**}$ & 0.9 & 0.5 & 10 \\ \hdashline
+        \textbf{41} & $Strat^{**}$ & $NP^{**}$ & $G^{**}$ & 0.9 & 0.9 & 10 \\ \hdashline
+        \textbf{42} & $Strat^{**}$ & $NP^{**}$ & $G^{**}$ & 0.9 & 1.0 & 10 \\ 
+        \hline
+    \end{tabular}
+    \caption{\textbf{Description of the parameters used to determine the best $(F, CR)$ combination for AMDE.} Since the four coefficients $(a,b,c,d)$ are strongly coupled through the trigonometric generating function (non-separable 4-dimensional landscape), high crossover rates, including $CR=1.0$, are particularly relevant. Case 36 ($F=0.5$, $CR=0.5$) corresponds to the winning configuration of \tableref{Cases_Determine_AMDE_Pop_Gen}: its results are reused without re-running the algorithm.}
+    \label{tab:Cases_Determine_AMDE_F_CR}
+\end{table}
+
+
+
+\subsubsection{Simulated Annealing}\label{sec:cases_sa}
+
+We now present the same approach for the simulated annealing method with only two parameters : the initial temperature and the cooling rate. We use common value (see section \ref{sec:simulated_annealing_theoretical_reviews}) to make also a Gread search (\tableref{Cases_Determine_SA_Schedule}) in order to find an equilibrium between early exploration and convergence speed.
+
+\begin{table}[H]
+    \centering
+    \renewcommand{\arraystretch}{1.5}
+    \begin{tabular}{|c|c|c|c|c|}
+        \hline 
+        \textbf{Case n°} & \textbf{Initial Temperature ($T_0$)} & \textbf{Cooling Rate ($\alpha$)} & $T_{\text{end}}/T_0$ & \textbf{Run per algo} \\ \hline
+
+        \textbf{43} & 0.001 & 0.999  & $\approx 4.5\times10^{-5}$ & 10 \\ \hdashline
+        \textbf{44} & 0.001 & 0.9995 & $\approx 6.7\times10^{-3}$ & 10 \\ \hdashline
+        \textbf{45} & 0.001 & 0.9999 & $\approx 0.37$ & 10 \\ \hdashline
+        \textbf{46} & 0.01  & 0.999  & $\approx 4.5\times10^{-5}$ & 10 \\ \hdashline
+        \textbf{47} & 0.01  & 0.9995 & $\approx 6.7\times10^{-3}$ & 10 \\ \hdashline
+        \textbf{48} & 0.01  & 0.9999 & $\approx 0.37$ & 10 \\ \hdashline
+        \textbf{49} & 0.1   & 0.999  & $\approx 4.5\times10^{-5}$ & 10 \\ \hdashline
+        \textbf{50} & 0.1   & 0.9995 & $\approx 6.7\times10^{-3}$ & 10 \\ \hdashline
+        \textbf{51} & 0.1   & 0.9999 & $\approx 0.37$ & 10 \\ \hdashline
+        \textbf{52} & 1     & 0.999  & $\approx 4.5\times10^{-5}$ & 10 \\ \hdashline
+        \textbf{53} & 1     & 0.9995 & $\approx 6.7\times10^{-3}$ & 10 \\ \hdashline
+        \textbf{54} & 1     & 0.9999 & $\approx 0.37$ & 10 \\ 
+        \hline
+    \end{tabular}
+    \caption{\textbf{Description of the parameters used to determine the best annealing schedule $(T_0, \alpha)$ for Simulated Annealing.} The evaluation budget is fixed to $eval_{\max} = 10\,000$ for all cases, and $T_{\text{end}}/T_0 = \alpha^{eval_{\max}}$ indicates how much the system has cooled down by the end of the run. Since $T_0$ and $\alpha$ jointly define the temperature schedule, a full grid is used instead of a sequential tuning.}
+    \label{tab:Cases_Determine_SA_Schedule}
+\end{table}
+
+\subsubsection{Novel Binary Particle Swarm Optimization (NBPSO)}\label{sec:cases_nbpso}
+
+As established in section \ref{sec:binary_PSO}, the Novel Binary Particle Swarm Optimization (NBPSO) introduced by Khanesar et al. \cite{4433821} redefines the velocity as the probability of changing a bit's state. Because this restores the physical meaning of velocity from the continuous domain, we can tune the NBPSO using standard continuous PSO parameters: the swarm size ($S$), the number of iterations ($G$), the inertia weight ($\lambda$), the cognitive coefficient ($c_p$), and the social coefficient ($c_g$).
+
+First, we search for the best trade-off between the swarm size ($S$) and the number of iterations ($G$) (\tableref{Cases_Determine_NBPSO_Pop_Gen}). To maintain a fair comparison with our previous algorithms, the total number of fitness evaluations is fixed to $10\,000$. During this stage, we use standard empirical values for the other parameters: $\lambda=0.729$, and $c_p = c_g = 1.49445$.
+
+\begin{table}[H]
+    \centering
+    \renewcommand{\arraystretch}{1.5}
+    \begin{tabular}{|c|c|c|c|c|c|c|}
+        \hline 
+        \textbf{Case n°} & \textbf{Swarm Size ($S$)} & \textbf{Iterations ($G$)} & $\lambda$ & $c_p$ & $c_g$ & \textbf{Run per algo} \\ \hline
+
+        \textbf{55} & 100 & 100 & 0.729 & 1.49445 & 1.49445 & 10 \\ \hdashline
+        \textbf{56} & 50 & 200 & 0.729 & 1.49445 & 1.49445 & 10 \\ \hdashline
+        \textbf{57} & 20 & 500 & 0.729 & 1.49445 & 1.49445 & 10 \\ 
+        \hline
+    \end{tabular}
+    \caption{\textbf{Description of the parameters used to determine the best Swarm Size / Iterations ratio for NBPSO.}}
+    \label{tab:Cases_Determine_NBPSO_Pop_Gen}
+\end{table}
+
+Let us assume the best configuration found is denoted by $S^*$ and $G^*$. We then proceed to tune the acceleration coefficients, $c_p$ and $c_g$ (\tableref{Cases_Determine_NBPSO_C1_C2}). These parameters dictate the behavior of the particles: a higher $c_p$ favors personal exploration (cognitive), while a higher $c_g$ accelerates convergence toward the best-known solution in the swarm (social). We test a balanced approach, a cognitive-heavy approach, and a social-heavy approach.
+
+{\color{blue} expliquer pourquoi on fait varier $c_p$ et $c_g$ de manière équilibrée}
+
+\begin{equation}\label{eq:pso_convergence_condition}
+    \lambda \geq \frac{c_p + c_g}{2} - 1 \quad \Longleftrightarrow \quad c_p + c_g \leq 2(\lambda + 1).
+\end{equation}
+
+
+\begin{table}[H]
+    \centering
+    \renewcommand{\arraystretch}{1.5}
+    \begin{tabular}{|c|c|c|c|c|c|c|}
+        \hline 
+        \textbf{Case n°} & \textbf{Swarm Size ($S$)} & \textbf{Iterations ($G$)} & $\lambda$ & $c_p$ & $c_g$ & \textbf{Run per algo} \\ \hline
+
+        \textbf{53} & $S^*$ & $G^*$ & 0.729 & 1.9 & 1.0 & 10 \\ \hdashline
+        \textbf{54} & $S^*$ & $G^*$ & 0.729 & 1.0 & 1.9 & 10 \\ \hdashline
+        \textbf{55} & $S^*$ & $G^*$ & 0.729 & 1.0 & 1.0 & 10 \\ 
+        \hline
+    \end{tabular}
+    \caption{\textbf{Description of the parameters used to determine the best acceleration coefficients for NBPSO.} The balanced moderate configuration ($c_p = c_g = 1.49445$) is reused from the winning case of \tableref{Cases_Determine_NBPSO_Pop_Gen} as a fourth comparison point. The two asymmetric cases (58, 59) keep the total acceleration constant ($c_p + c_g = 2.9$) in order to isolate the effect of the cognitive/social repartition, while Case 60 tests a reduced total acceleration. All configurations satisfy the convergence condition \eqref{eq:pso_convergence_condition}: $c_p + c_g \leq 2.9 \leq 2(\lambda+1) = 3.458$.}
+    \label{tab:Cases_Determine_NBPSO_C1_C2}
+\end{table}
+
+Denoting the best acceleration coefficients as $c_p^*$ and $c_g^*$, we finally investigate the inertia weight $\lambda$ (\tableref{Cases_Determine_NBPSO_Inertia}). The inertia weight controls the momentum of the particles. A high value facilitates global exploration, while a low value facilitates local exploitation. Alongside static values ($0.9$ and $0.5$), we also implement and test a Linearly Decreasing Inertia Weight (LDIW), which starts at $0.9$ and linearly decreases to $0.4$ over the iterations to dynamically shift the search from exploration to exploitation.
+
+{\color{blue} mettre la formule du LDIW
+
+\begin{equation}\label{eq:ldiw}
+    \lambda(t) = \lambda_{\max} - \left(\lambda_{\max} - \lambda_{\min}\right)\frac{t}{G}, 
+    \qquad \lambda_{\max} = 0.9, \quad \lambda_{\min} = 0.5.
+\end{equation}
+
+}
+
+\begin{table}[H]
+    \centering
+    \renewcommand{\arraystretch}{1.5}
+    \begin{tabular}{|c|c|c|c|c|c|c|}
+        \hline 
+        \textbf{Case n°} & \textbf{Swarm Size ($S$)} & \textbf{Iterations ($G$)} & $\lambda$ & $c_p$ & $c_g$ & \textbf{Run per algo} \\ \hline
+
+        \textbf{56} & $S^*$ & $G^*$ & 0.9 & $c_p^*$ & $c_g^*$ & 10 \\ \hdashline
+        \textbf{57} & $S^*$ & $G^*$ & 0.5 & $c_p^*$ & $c_g^*$ & 10 \\ \hdashline
+        \textbf{58} & $S^*$ & $G^*$ & LDIW ($0.9 \rightarrow 0.5$) & $c_p^*$ & $c_g^*$ & 10 \\ 
+        \hline
+    \end{tabular}
+    \caption{\textbf{Description of the parameters used to determine the best inertia weight strategy for NBPSO.} The static value $\lambda = 0.729$ is reused from the winning case of \tableref{Cases_Determine_NBPSO_C1_C2} as a fourth comparison point. By construction of the previous stage, $c_p^* + c_g^* \leq 2.989$, so the convergence condition \eqref{eq:pso_convergence_condition} requires $\lambda \geq 0.494$: it is satisfied by all tested values, including the lower bound of the LDIW schedule, which is set to $0.5$ instead of the classical $0.4$ for this reason.}
+    \label{tab:Cases_Determine_NBPSO_Inertia}
+\end{table}
+
+\subsubsection{Updated Particle Swarm Optimization}
+
+{\color{blue} LDIW ?}
+
+\subsection{Running experiment}\label{sec:running_experiment}
+
+We will start by finding an optimal set of parameters for the evolutionary algorithm \ref{sec:evolutionary_algorithm_parameters} and then for the simulated annealing \ref{sec:simulated_annealing_parameters}.
+
+For every table of results : each instance is described by its number of tasks and machines as $J\times M$ ; the color green is used to highlight the best score and the best average score for each instance and the color red for the worst ; Evolutionary Alg. [10x] indicates ten iterations of the
+evolutionary algorithm and best* (best* indicates the best value from each 10 runs), worst, average and standard deviation (std), computation time and Number of Function Evaluations (NFE) are provided for each case and finally the best known value is indicated.
+
+For each parameters, we present the results from each instance of the same level of difficulty in a separate table.
+
+\subsubsection{Differential evolution}
+
+\subsubsubsection{Binary Differential Evolution}
+
+\paragraph{Strategy to choose the base vector} ~
+
+\begin{table}[H]
+    \centering
+    \renewcommand{\arraystretch}{1.2}
+    \resizebox{\linewidth}{!}{
+    \begin{tabular}{|c | c | c c c c c c | c c c c c c |}
+        \hline
+        \multicolumn{2}{|c|}{} & \multicolumn{12}{c|}{\textbf{Binary Differential Evolution [10x]}} \\ \cline{3-14}
+        \multicolumn{2}{|c|}{} & \multicolumn{6}{c|}{\textbf{SVM (heavy model)}} & \multicolumn{6}{c|}{\textbf{kNN (light model)}} \\ \hline
+        \multirow{2}{*}{\textbf{Data}} & \multirow{2}{*}{\diagbox[width=3.2cm, height=1.1cm]{\textbf{Stat.}}{\textbf{Case}}} & \multirow{2}{*}{\textbf{1}} & \multirow{2}{*}{\textbf{2}} & \multirow{2}{*}{\textbf{3}} & \multirow{2}{*}{\textbf{4}} & \multirow{2}{*}{\textbf{5}} & \multirow{2}{*}{\textbf{6}} & \multirow{2}{*}{\textbf{1}} & \multirow{2}{*}{\textbf{2}} & \multirow{2}{*}{\textbf{3}} & \multirow{2}{*}{\textbf{4}} & \multirow{2}{*}{\textbf{5}} & \multirow{2}{*}{\textbf{6}} \\
+        & & & & & & & & & & & & & \\ \hline
+        \multirow{4}{*}{\textbf{Score}}
+        & \textbf{best*} & \cellcolor{worst}94.9 & \cellcolor{best}97.4 & 94.9 & 94.9 & 94.9 & 94.9 & \cellcolor{best}92.3 & \cellcolor{best}92.3 & \cellcolor{best}92.3 & \cellcolor{best}92.3 & \cellcolor{worst}87.2 & \cellcolor{best}92.3 \\
+        & \textbf{worst} & 92.3 & 92.3 & 89.7 & 89.7 & 89.7 & 89.7 & 71.8 & 76.9 & 71.8 & 71.8 & 71.8 & 71.8 \\
+        & \textbf{avg}   & \cellcolor{best}93.33 & \cellcolor{best}93.33 & \cellcolor{worst}91.79 & 92.82 & 93.08 & 92.82 & \cellcolor{best}86.15 & 83.85 & 84.10 & \cellcolor{worst}81.54 & 83.08 & 82.05 \\
+        & \textbf{std}   & 1.32 & 1.79 & 1.62 & 1.62 & 1.73 & 1.62 & 6.42 & 4.20 & 7.81 & 6.14 & 4.71 & 5.27 \\ \hline
+        \textbf{Time} & \textbf{CPU (s)} & 586.82 & 577.79 & 196.15 & 197.29 & 579.82 & 576.31 & 374.09 & 369.99 & 146.54 & 148.29 & 374.88 & 361.95 \\ \hline
+        \textbf{NFE} & \textbf{number} & 10050 & 10050 & 10050 & 10050 & 10050 & 10050 & 10050 & 10050 & 10050 & 10050 & 10050 & 10050 \\ \hline
+        \textbf{Feat.} & \textbf{avg \#} & 10.6 & 10.5 & 10.2 & 9.7 & 9.9 & 9.6 & 10.4 & 9.0 & 11.3 & 10.0 & 9.4 & 9.3 \\ \hline
+    \end{tabular}
+    }
+    \caption{\textbf{BDE results on dataset~174 for the mutation strategy selection (cases 1--6).} Higher accuracy is better; green = best, red = worst among the strategies, per model.}
+    \label{tab:results_BDE_strategy_d174}
+\end{table}
+
+\begin{table}[H]
+    \centering
+    \renewcommand{\arraystretch}{1.2}
+    \resizebox{\linewidth}{!}{
+    \begin{tabular}{|c | c | c c c c c c | c c c c c c |}
+        \hline
+        \multicolumn{2}{|c|}{} & \multicolumn{12}{c|}{\textbf{Binary Differential Evolution [10x]}} \\ \cline{3-14}
+        \multicolumn{2}{|c|}{} & \multicolumn{6}{c|}{\textbf{SVM (heavy model)}} & \multicolumn{6}{c|}{\textbf{kNN (light model)}} \\ \hline
+        \multirow{2}{*}{\textbf{Data}} & \multirow{2}{*}{\diagbox[width=3.2cm, height=1.1cm]{\textbf{Stat.}}{\textbf{Case}}} & \multirow{2}{*}{\textbf{1}} & \multirow{2}{*}{\textbf{2}} & \multirow{2}{*}{\textbf{3}} & \multirow{2}{*}{\textbf{4}} & \multirow{2}{*}{\textbf{5}} & \multirow{2}{*}{\textbf{6}} & \multirow{2}{*}{\textbf{1}} & \multirow{2}{*}{\textbf{2}} & \multirow{2}{*}{\textbf{3}} & \multirow{2}{*}{\textbf{4}} & \multirow{2}{*}{\textbf{5}} & \multirow{2}{*}{\textbf{6}} \\
+        & & & & & & & & & & & & & \\ \hline
+        \multirow{4}{*}{\textbf{Score}}
+        & \textbf{best*} & \cellcolor{best}98.2 & \cellcolor{best}98.2 & \cellcolor{worst}97.4 & 98.2 & \cellcolor{best}98.2 & 97.4 & \cellcolor{worst}94.7 & \cellcolor{worst}94.7 & \cellcolor{best}95.6 & \cellcolor{worst}94.7 & \cellcolor{worst}94.7 & \cellcolor{worst}94.7 \\
+        & \textbf{worst} & 93.0 & 93.9 & 95.6 & 95.6 & 94.7 & 94.7 & 88.6 & 90.4 & 87.7 & 86.0 & 90.4 & 87.7 \\
+        & \textbf{avg}   & 96.58 & \cellcolor{best}97.19 & 96.49 & 96.84 & 97.02 & \cellcolor{worst}96.40 & 92.11 & 92.37 & 91.75 & 91.49 & \cellcolor{best}92.72 & \cellcolor{worst}91.40 \\
+        & \textbf{std}   & 1.57 & 1.36 & 0.83 & 1.03 & 1.32 & 0.97 & 2.11 & 1.44 & 2.27 & 2.27 & 1.66 & 1.74 \\ \hline
+        \textbf{Time} & \textbf{CPU (s)} & 182.53 & 181.13 & 266.26 & 267.22 & 181.44 & 182.73 & 118.49 & 119.33 & 171.61 & 173.70 & 118.36 & 118.16 \\ \hline
+        \textbf{NFE} & \textbf{number} & 10050 & 10050 & 10050 & 10050 & 10050 & 10050 & 10050 & 10050 & 10050 & 10050 & 10050 & 10050 \\ \hline
+        \textbf{Feat.} & \textbf{avg \#} & 14.7 & 15.4 & 16.6 & 14.2 & 14.5 & 14.8 & 15.5 & 14.8 & 13.2 & 14.8 & 15.2 & 14.2 \\ \hline
+    \end{tabular}
+    }
+    \caption{\textbf{BDE results on dataset~17 for the mutation strategy selection (cases 1--6).} Same conventions as \tableref{results_BDE_strategy_d174}.}
+    \label{tab:results_BDE_strategy_d17}
+\end{table}
+
+\begin{table}[H]
+    \centering
+    \renewcommand{\arraystretch}{1.2}
+    \resizebox{\linewidth}{!}{
+    \begin{tabular}{|c | c | c c c c c c | c c c c c c |}
+        \hline
+        \multicolumn{2}{|c|}{} & \multicolumn{12}{c|}{\textbf{Binary Differential Evolution [10x]}} \\ \cline{3-14}
+        \multicolumn{2}{|c|}{} & \multicolumn{6}{c|}{\textbf{SVM (heavy model)}} & \multicolumn{6}{c|}{\textbf{kNN (light model)}} \\ \hline
+        \multirow{2}{*}{\textbf{Data}} & \multirow{2}{*}{\diagbox[width=3.2cm, height=1.1cm]{\textbf{Stat.}}{\textbf{Case}}} & \multirow{2}{*}{\textbf{1}} & \multirow{2}{*}{\textbf{2}} & \multirow{2}{*}{\textbf{3}} & \multirow{2}{*}{\textbf{4}} & \multirow{2}{*}{\textbf{5}} & \multirow{2}{*}{\textbf{6}} & \multirow{2}{*}{\textbf{1}} & \multirow{2}{*}{\textbf{2}} & \multirow{2}{*}{\textbf{3}} & \multirow{2}{*}{\textbf{4}} & \multirow{2}{*}{\textbf{5}} & \multirow{2}{*}{\textbf{6}} \\
+        & & & & & & & & & & & & & \\ \hline
+        \multirow{4}{*}{\textbf{Score}}
+        & \textbf{best*} & \cellcolor{worst}97.2 & \cellcolor{best}98.6 & \cellcolor{best}98.6 & 97.2 & 97.2 & \cellcolor{best}98.6 & 94.4 & 94.4 & \cellcolor{worst}93.0 & \cellcolor{best}95.8 & 94.4 & 94.4 \\
+        & \textbf{worst} & 93.0 & 90.1 & 93.0 & 91.5 & 94.4 & 93.0 & 85.9 & 87.3 & 84.5 & 85.9 & 84.5 & 84.5 \\
+        & \textbf{avg}   & 95.21 & \cellcolor{best}96.48 & 96.06 & \cellcolor{worst}95.07 & 96.06 & 95.35 & \cellcolor{worst}89.58 & 90.56 & 90.14 & \cellcolor{best}90.70 & 90.56 & 90.14 \\
+        & \textbf{std}   & 1.36 & 2.68 & 2.18 & 1.66 & 1.11 & 2.00 & 2.67 & 2.40 & 2.97 & 2.83 & 3.19 & 4.04 \\ \hline
+        \textbf{Time} & \textbf{CPU (s)} & 173.63 & 219.43 & 248.73 & 244.83 & 174.57 & 233.03 & 125.99 & 145.74 & 165.93 & 164.61 & 144.43 & 146.20 \\ \hline
+        \textbf{NFE} & \textbf{number} & 10050 & 10050 & 10050 & 10050 & 10050 & 10050 & 10050 & 10050 & 10050 & 10050 & 10050 & 10050 \\ \hline
+        \textbf{Feat.} & \textbf{avg \#} & 15.8 & 16.8 & 16.7 & 17.0 & 15.6 & 16.3 & 10.5 & 10.8 & 10.3 & 11.1 & 9.6 & 10.7 \\ \hline
+    \end{tabular}
+    }
+    \caption{\textbf{BDE results on dataset~52 for the mutation strategy selection (cases 1--6).} Same conventions as \tableref{results_BDE_strategy_d174}.}
+    \label{tab:results_BDE_strategy_d52}
+\end{table}
+
+\begin{table}[H]
+    \centering
+    \renewcommand{\arraystretch}{1.2}
+    \resizebox{\linewidth}{!}{
+    \begin{tabular}{|c | c | c c c c c c | c c c c c c |}
+        \hline
+        \multicolumn{2}{|c|}{} & \multicolumn{12}{c|}{\textbf{Binary Differential Evolution [10x]}} \\ \cline{3-14}
+        \multicolumn{2}{|c|}{} & \multicolumn{6}{c|}{\textbf{SVM (heavy model)}} & \multicolumn{6}{c|}{\textbf{kNN (light model)}} \\ \hline
+        \multirow{2}{*}{\textbf{Data}} & \multirow{2}{*}{\diagbox[width=3.2cm, height=1.1cm]{\textbf{Stat.}}{\textbf{Case}}} & \multirow{2}{*}{\textbf{1}} & \multirow{2}{*}{\textbf{2}} & \multirow{2}{*}{\textbf{3}} & \multirow{2}{*}{\textbf{4}} & \multirow{2}{*}{\textbf{5}} & \multirow{2}{*}{\textbf{6}} & \multirow{2}{*}{\textbf{1}} & \multirow{2}{*}{\textbf{2}} & \multirow{2}{*}{\textbf{3}} & \multirow{2}{*}{\textbf{4}} & \multirow{2}{*}{\textbf{5}} & \multirow{2}{*}{\textbf{6}} \\
+        & & & & & & & & & & & & & \\ \hline
+        \multirow{4}{*}{\textbf{Score}}
+        & \textbf{best*} & \cellcolor{best}90.5 & \cellcolor{best}90.5 & \cellcolor{worst}88.1 & \cellcolor{worst}88.1 & \cellcolor{best}90.5 & \cellcolor{best}90.5 & \cellcolor{best}90.5 & \cellcolor{best}90.5 & \cellcolor{worst}83.3 & 88.1 & 88.1 & \cellcolor{worst}83.3 \\
+        & \textbf{worst} & 83.3 & 81.0 & 81.0 & 76.2 & 83.3 & 83.3 & 73.8 & 76.2 & 73.8 & 76.2 & 73.8 & 69.0 \\
+        & \textbf{avg}   & 85.00 & 85.00 & 84.05 & \cellcolor{worst}83.10 & \cellcolor{best}86.90 & 85.95 & 80.24 & \cellcolor{best}81.90 & 79.52 & 81.19 & 79.52 & \cellcolor{worst}77.14 \\
+        & \textbf{std}   & 2.26 & 2.76 & 2.26 & 4.82 & 2.02 & 2.62 & 4.63 & 5.17 & 3.21 & 3.26 & 4.08 & 4.92 \\ \hline
+        \textbf{Time} & \textbf{CPU (s)} & 254.65 & 255.11 & 258.48 & 244.84 & 256.51 & 250.98 & 168.99 & 167.00 & 170.08 & 160.61 & 170.29 & 169.94 \\ \hline
+        \textbf{NFE} & \textbf{number} & 10050 & 10050 & 10050 & 10050 & 10050 & 10050 & 10050 & 10050 & 10050 & 10050 & 10050 & 10050 \\ \hline
+        \textbf{Feat.} & \textbf{avg \#} & 28.2 & 27.5 & 29.4 & 27.6 & 28.8 & 27.8 & 28.1 & 30.2 & 28.9 & 29.0 & 29.7 & 29.9 \\ \hline
+    \end{tabular}
+    }
+    \caption{\textbf{BDE results on dataset~151 for the mutation strategy selection (cases 1--6).} Same conventions as \tableref{results_BDE_strategy_d174}.}
+    \label{tab:results_BDE_strategy_d151}
+\end{table}
+
+$Strat^{*} = best/1$
+
+\paragraph{Population/generation ratio} ~
+
+\begin{table}[H]
+    \centering
+    \renewcommand{\arraystretch}{1.2}
+    \resizebox{\linewidth}{!}{
+    \begin{tabular}{|c | c | c c c c | c c c c |}
+        \hline
+        \multicolumn{2}{|c|}{} & \multicolumn{8}{c|}{\textbf{Binary Differential Evolution [10x]}} \\ \cline{3-10}
+        \multicolumn{2}{|c|}{} & \multicolumn{4}{c|}{\textbf{SVM (heavy model)}} & \multicolumn{4}{c|}{\textbf{kNN (light model)}} \\ \hline
+        \multirow{2}{*}{\textbf{Data}} & \multirow{2}{*}{\diagbox[width=3.2cm, height=1.1cm]{\textbf{Stat.}}{\textbf{Case}}} & \multirow{2}{*}{\textbf{8bis}} & \multirow{2}{*}{\textbf{7}} & \multirow{2}{*}{\textbf{8}} & \multirow{2}{*}{\textbf{9}} & \multirow{2}{*}{\textbf{8bis}} & \multirow{2}{*}{\textbf{7}} & \multirow{2}{*}{\textbf{8}} & \multirow{2}{*}{\textbf{9}} \\
+        & & & & & & & & & \\ \hline
+        \multirow{4}{*}{\textbf{Score}}
+        & \textbf{best*} & \cellcolor{worst}94.9 & 94.9 & \cellcolor{best}97.4 & 94.9 & 92.3 & 92.3 & 92.3 & 92.3 \\
+        & \textbf{worst} & 89.7 & 89.7 & 92.3 & 87.2 & 71.8 & 82.1 & 76.9 & 79.5 \\
+        & \textbf{avg}   & 92.05 & \cellcolor{worst}91.54 & \cellcolor{best}93.33 & 92.05 & 84.87 & \cellcolor{best}86.41 & \cellcolor{worst}83.85 & 84.87 \\
+        & \textbf{std}   & 1.46 & 1.73 & 1.79 & 2.25 & 5.98 & 4.84 & 4.20 & 4.59 \\ \hline
+        \textbf{Time} & \textbf{CPU (s)} & 199.03 & 198.42 & 577.79 & 204.57 & 151.97 & 150.03 & 369.99 & 154.49 \\ \hline
+        \textbf{NFE} & \textbf{number} & 10200 & 10100 & 10050 & 10020 & 10200 & 10100 & 10050 & 10020 \\ \hline
+        \textbf{Feat.} & \textbf{avg \#} & 11.5 & 9.2 & 10.5 & 11.1 & 11.4 & 10.4 & 9.0 & 11.1 \\ \hline
+    \end{tabular}
+    }
+    \caption{\textbf{BDE results on dataset~174 for the population/generation ratio (cases 8bis--9). Higher accuracy is better; green = best, red = worst among the cases, per model.}}
+    \label{tab:results_BDE_popgen_d174}
+\end{table}
+
+\begin{table}[H]
+    \centering
+    \renewcommand{\arraystretch}{1.2}
+    \resizebox{\linewidth}{!}{
+    \begin{tabular}{|c | c | c c c c | c c c c |}
+        \hline
+        \multicolumn{2}{|c|}{} & \multicolumn{8}{c|}{\textbf{Binary Differential Evolution [10x]}} \\ \cline{3-10}
+        \multicolumn{2}{|c|}{} & \multicolumn{4}{c|}{\textbf{SVM (heavy model)}} & \multicolumn{4}{c|}{\textbf{kNN (light model)}} \\ \hline
+        \multirow{2}{*}{\textbf{Data}} & \multirow{2}{*}{\diagbox[width=3.2cm, height=1.1cm]{\textbf{Stat.}}{\textbf{Case}}} & \multirow{2}{*}{\textbf{8bis}} & \multirow{2}{*}{\textbf{7}} & \multirow{2}{*}{\textbf{8}} & \multirow{2}{*}{\textbf{9}} & \multirow{2}{*}{\textbf{8bis}} & \multirow{2}{*}{\textbf{7}} & \multirow{2}{*}{\textbf{8}} & \multirow{2}{*}{\textbf{9}} \\
+        & & & & & & & & & \\ \hline
+        \multirow{4}{*}{\textbf{Score}}
+        & \textbf{best*} & \cellcolor{worst}97.4 & \cellcolor{best}98.2 & 98.2 & 98.2 & \cellcolor{best}95.6 & 95.6 & 94.7 & \cellcolor{worst}93.9 \\
+        & \textbf{worst} & 94.7 & 93.9 & 93.9 & 95.6 & 91.2 & 87.7 & 90.4 & 89.5 \\
+        & \textbf{avg}   & 96.40 & \cellcolor{worst}96.14 & \cellcolor{best}97.19 & 97.11 & \cellcolor{best}93.86 & 93.25 & 92.37 & \cellcolor{worst}91.67 \\
+        & \textbf{std}   & 0.87 & 1.50 & 1.36 & 1.10 & 1.85 & 2.58 & 1.44 & 1.39 \\ \hline
+        \textbf{Time} & \textbf{CPU (s)} & 265.67 & 266.73 & 181.13 & 266.56 & 172.35 & 171.87 & 119.33 & 173.21 \\ \hline
+        \textbf{NFE} & \textbf{number} & 10200 & 10100 & 10050 & 10020 & 10200 & 10100 & 10050 & 10020 \\ \hline
+        \textbf{Feat.} & \textbf{avg \#} & 15.4 & 15.2 & 15.4 & 15.1 & 15.3 & 14.1 & 14.8 & 15.0 \\ \hline
+    \end{tabular}
+    }
+    \caption{\textbf{BDE results on dataset~17 for the population/generation ratio (cases 8bis--9). Same conventions as \tableref{results_BDE_popgen_d174}.}}
+    \label{tab:results_BDE_popgen_d17}
+\end{table}
+
+\begin{table}[H]
+    \centering
+    \renewcommand{\arraystretch}{1.2}
+    \resizebox{\linewidth}{!}{
+    \begin{tabular}{|c | c | c c c c | c c c c |}
+        \hline
+        \multicolumn{2}{|c|}{} & \multicolumn{8}{c|}{\textbf{Binary Differential Evolution [10x]}} \\ \cline{3-10}
+        \multicolumn{2}{|c|}{} & \multicolumn{4}{c|}{\textbf{SVM (heavy model)}} & \multicolumn{4}{c|}{\textbf{kNN (light model)}} \\ \hline
+        \multirow{2}{*}{\textbf{Data}} & \multirow{2}{*}{\diagbox[width=3.2cm, height=1.1cm]{\textbf{Stat.}}{\textbf{Case}}} & \multirow{2}{*}{\textbf{8bis}} & \multirow{2}{*}{\textbf{7}} & \multirow{2}{*}{\textbf{8}} & \multirow{2}{*}{\textbf{9}} & \multirow{2}{*}{\textbf{8bis}} & \multirow{2}{*}{\textbf{7}} & \multirow{2}{*}{\textbf{8}} & \multirow{2}{*}{\textbf{9}} \\
+        & & & & & & & & & \\ \hline
+        \multirow{4}{*}{\textbf{Score}}
+        & \textbf{best*} & \cellcolor{best}98.6 & 98.6 & 98.6 & \cellcolor{worst}97.2 & \cellcolor{worst}93.0 & \cellcolor{best}95.8 & 94.4 & 93.0 \\
+        & \textbf{worst} & 93.0 & 94.4 & 90.1 & 94.4 & 80.3 & 90.1 & 87.3 & 83.1 \\
+        & \textbf{avg}   & \cellcolor{worst}96.06 & 96.06 & \cellcolor{best}96.48 & 96.48 & 90.00 & \cellcolor{best}92.54 & 90.56 & \cellcolor{worst}89.72 \\
+        & \textbf{std}   & 1.97 & 1.29 & 2.68 & 1.00 & 4.01 & 1.76 & 2.40 & 3.26 \\ \hline
+        \textbf{Time} & \textbf{CPU (s)} & 245.46 & 243.42 & 219.43 & 239.15 & 166.31 & 163.94 & 145.74 & 163.12 \\ \hline
+        \textbf{NFE} & \textbf{number} & 10200 & 10100 & 10050 & 10020 & 10200 & 10100 & 10050 & 10020 \\ \hline
+        \textbf{Feat.} & \textbf{avg \#} & 16.7 & 17.2 & 16.8 & 15.7 & 10.6 & 10.8 & 10.8 & 11.7 \\ \hline
+    \end{tabular}
+    }
+    \caption{\textbf{BDE results on dataset~52 for the population/generation ratio (cases 8bis--9). Same conventions as \tableref{results_BDE_popgen_d174}.}}
+    \label{tab:results_BDE_popgen_d52}
+\end{table}
+
+\begin{table}[H]
+    \centering
+    \renewcommand{\arraystretch}{1.2}
+    \resizebox{\linewidth}{!}{
+    \begin{tabular}{|c | c | c c c c | c c c c |}
+        \hline
+        \multicolumn{2}{|c|}{} & \multicolumn{8}{c|}{\textbf{Binary Differential Evolution [10x]}} \\ \cline{3-10}
+        \multicolumn{2}{|c|}{} & \multicolumn{4}{c|}{\textbf{SVM (heavy model)}} & \multicolumn{4}{c|}{\textbf{kNN (light model)}} \\ \hline
+        \multirow{2}{*}{\textbf{Data}} & \multirow{2}{*}{\diagbox[width=3.2cm, height=1.1cm]{\textbf{Stat.}}{\textbf{Case}}} & \multirow{2}{*}{\textbf{8bis}} & \multirow{2}{*}{\textbf{7}} & \multirow{2}{*}{\textbf{8}} & \multirow{2}{*}{\textbf{9}} & \multirow{2}{*}{\textbf{8bis}} & \multirow{2}{*}{\textbf{7}} & \multirow{2}{*}{\textbf{8}} & \multirow{2}{*}{\textbf{9}} \\
+        & & & & & & & & & \\ \hline
+        \multirow{4}{*}{\textbf{Score}}
+        & \textbf{best*} & \cellcolor{worst}88.1 & \cellcolor{best}90.5 & 90.5 & 90.5 & 88.1 & \cellcolor{worst}85.7 & \cellcolor{best}90.5 & 90.5 \\
+        & \textbf{worst} & 81.0 & 81.0 & 81.0 & 81.0 & 69.0 & 71.4 & 76.2 & 66.7 \\
+        & \textbf{avg}   & \cellcolor{worst}83.81 & 84.29 & \cellcolor{best}85.00 & 84.76 & \cellcolor{worst}78.10 & 78.57 & \cellcolor{best}81.90 & 78.57 \\
+        & \textbf{std}   & 2.70 & 2.79 & 2.76 & 3.21 & 5.36 & 4.05 & 5.17 & 6.64 \\ \hline
+        \textbf{Time} & \textbf{CPU (s)} & 252.40 & 246.32 & 255.11 & 248.22 & 168.05 & 167.73 & 167.00 & 163.98 \\ \hline
+        \textbf{NFE} & \textbf{number} & 10200 & 10100 & 10050 & 10020 & 10200 & 10100 & 10050 & 10020 \\ \hline
+        \textbf{Feat.} & \textbf{avg \#} & 29.5 & 28.1 & 27.5 & 27.9 & 30.6 & 29.9 & 30.2 & 30.9 \\ \hline
+    \end{tabular}
+    }
+    \caption{\textbf{BDE results on dataset~151 for the population/generation ratio (cases 8bis--9). Same conventions as \tableref{results_BDE_popgen_d174}.}}
+    \label{tab:results_BDE_popgen_d151}
+\end{table}
+
+\begin{table}[H]
+    \centering
+    \renewcommand{\arraystretch}{1.2}
+    \resizebox{\linewidth}{!}{
+    \begin{tabular}{|c | c | c c c c | c c c c |}
+        \hline
+        \multicolumn{2}{|c|}{} & \multicolumn{8}{c|}{\textbf{Binary Differential Evolution [10x]}} \\ \cline{3-10}
+        \multicolumn{2}{|c|}{} & \multicolumn{4}{c|}{\textbf{SVM (heavy model)}} & \multicolumn{4}{c|}{\textbf{kNN (light model)}} \\ \hline
+        \multirow{2}{*}{\textbf{Data}} & \multirow{2}{*}{\diagbox[width=3.2cm, height=1.1cm]{\textbf{Stat.}}{\textbf{Case}}} & \multirow{2}{*}{\textbf{8bis}} & \multirow{2}{*}{\textbf{7}} & \multirow{2}{*}{\textbf{8}} & \multirow{2}{*}{\textbf{9}} & \multirow{2}{*}{\textbf{8bis}} & \multirow{2}{*}{\textbf{7}} & \multirow{2}{*}{\textbf{8}} & \multirow{2}{*}{\textbf{9}} \\
+        & & & & & & & & & \\ \hline
+        \multirow{4}{*}{\textbf{Score}}
+        & \textbf{best*} & 100.0 & 100.0 & -- & 100.0 & 100.0 & 100.0 & -- & 100.0 \\
+        & \textbf{worst} & 100.0 & 100.0 & -- & 100.0 & 100.0 & 100.0 & -- & 100.0 \\
+        & \textbf{avg}   & 100.00 & 100.00 & -- & 100.00 & 100.00 & 100.00 & -- & 100.00 \\
+        & \textbf{std}   & 0.00 & 0.00 & -- & 0.00 & 0.00 & 0.00 & -- & 0.00 \\ \hline
+        \textbf{Time} & \textbf{CPU (s)} & 8.25 & 4.16 & -- & 0.83 & 13.38 & 6.66 & -- & 1.33 \\ \hline
+        \textbf{NFE} & \textbf{number} & 200 & 100 & -- & 20 & 200 & 100 & -- & 20 \\ \hline
+        \textbf{Feat.} & \textbf{avg \#} & 16.7 & 16.1 & -- & 17.3 & 16.7 & 16.1 & -- & 17.3 \\ \hline
+    \end{tabular}
+    }
+    \caption{\textbf{BDE results on dataset~0 for the population/generation ratio (cases 8bis--9). Same conventions as \tableref{results_BDE_popgen_d174}.}}
+    \label{tab:results_BDE_popgen_d0}
+\end{table}
+
+
+
+\subsubsubsection{Angle Modulation Differential Evolution}
+
+\paragraph{Strategy to choose the base vector} ~
+
+\begin{table}[H]
+    \centering
+    \renewcommand{\arraystretch}{1.2}
+    \resizebox{\linewidth}{!}{
+    \begin{tabular}{|c | c | c c c c c c | c c c c c c |}
+        \hline
+        \multicolumn{2}{|c|}{} & \multicolumn{12}{c|}{\textbf{Angle Modulation Differential Evolution [10x]}} \\ \cline{3-14}
+        \multicolumn{2}{|c|}{} & \multicolumn{6}{c|}{\textbf{SVM (heavy model)}} & \multicolumn{6}{c|}{\textbf{kNN (light model)}} \\ \hline
+        \multirow{2}{*}{\textbf{Data}} & \multirow{2}{*}{\diagbox[width=3.2cm, height=1.1cm]{\textbf{Stat.}}{\textbf{Case}}} & \multirow{2}{*}{\textbf{22}} & \multirow{2}{*}{\textbf{23}} & \multirow{2}{*}{\textbf{24}} & \multirow{2}{*}{\textbf{25}} & \multirow{2}{*}{\textbf{26}} & \multirow{2}{*}{\textbf{27}} & \multirow{2}{*}{\textbf{22}} & \multirow{2}{*}{\textbf{23}} & \multirow{2}{*}{\textbf{24}} & \multirow{2}{*}{\textbf{25}} & \multirow{2}{*}{\textbf{26}} & \multirow{2}{*}{\textbf{27}} \\
+        & & & & & & & & & & & & & \\ \hline
+        \multirow{4}{*}{\textbf{Score}}
+        & \textbf{best*} & \cellcolor{best}94.9 & \cellcolor{best}94.9 & \cellcolor{best}94.9 & \cellcolor{best}94.9 & \cellcolor{best}94.9 & \cellcolor{best}94.9 & \cellcolor{best}89.7 & \cellcolor{best}89.7 & \cellcolor{best}89.7 & \cellcolor{worst}87.2 & \cellcolor{best}89.7 & \cellcolor{worst}87.2 \\
+        & \textbf{worst} & 92.3 & 84.6 & 89.7 & 84.6 & 84.6 & 84.6 & 82.1 & 82.1 & 82.1 & 82.1 & 82.1 & 82.1 \\
+        & \textbf{avg}   & \cellcolor{best}93.85 & 92.56 & 93.59 & 93.59 & \cellcolor{worst}91.54 & 92.31 & 86.41 & 85.90 & \cellcolor{best}86.92 & 85.64 & \cellcolor{worst}84.36 & 85.13 \\
+        & \textbf{std}   & 1.32 & 3.07 & 1.81 & 3.25 & 2.97 & 2.96 & 2.43 & 2.77 & 1.89 & 2.48 & 3.07 & 2.65 \\ \hline
+        \textbf{Time} & \textbf{CPU (s)} & 575.30 & 559.21 & 200.76 & 202.95 & 569.97 & 546.24 & 361.17 & 353.02 & 145.22 & 144.67 & 345.07 & 358.44 \\ \hline
+        \textbf{NFE} & \textbf{number} & 10050 & 10050 & 10050 & 10050 & 10050 & 10050 & 10050 & 10050 & 10050 & 10050 & 10050 & 10050 \\ \hline
+        \textbf{Feat.} & \textbf{avg \#} & 8.7 & 9.7 & 10.2 & 9.8 & 7.3 & 8.8 & 10.6 & 9.5 & 11.3 & 10.9 & 9.7 & 9.3 \\ \hline
+    \end{tabular}
+    }
+    \caption{\textbf{AMDE results on dataset~174 for the mutation strategy selection (cases 22--27).} Higher accuracy is better; green = best, red = worst among the strategies, per model.}
+    \label{tab:results_AMDE_strategy_d174}
+\end{table}
+
+\begin{table}[H]
+    \centering
+    \renewcommand{\arraystretch}{1.2}
+    \resizebox{\linewidth}{!}{
+    \begin{tabular}{|c | c | c c c c c c | c c c c c c |}
+        \hline
+        \multicolumn{2}{|c|}{} & \multicolumn{12}{c|}{\textbf{Angle Modulation Differential Evolution [10x]}} \\ \cline{3-14}
+        \multicolumn{2}{|c|}{} & \multicolumn{6}{c|}{\textbf{SVM (heavy model)}} & \multicolumn{6}{c|}{\textbf{kNN (light model)}} \\ \hline
+        \multirow{2}{*}{\textbf{Data}} & \multirow{2}{*}{\diagbox[width=3.2cm, height=1.1cm]{\textbf{Stat.}}{\textbf{Case}}} & \multirow{2}{*}{\textbf{22}} & \multirow{2}{*}{\textbf{23}} & \multirow{2}{*}{\textbf{24}} & \multirow{2}{*}{\textbf{25}} & \multirow{2}{*}{\textbf{26}} & \multirow{2}{*}{\textbf{27}} & \multirow{2}{*}{\textbf{22}} & \multirow{2}{*}{\textbf{23}} & \multirow{2}{*}{\textbf{24}} & \multirow{2}{*}{\textbf{25}} & \multirow{2}{*}{\textbf{26}} & \multirow{2}{*}{\textbf{27}} \\
+        & & & & & & & & & & & & & \\ \hline
+        \multirow{4}{*}{\textbf{Score}}
+        & \textbf{best*} & \cellcolor{best}98.2 &\cellcolor{best} 98.2 & \cellcolor{worst}96.5 & \cellcolor{best}98.2 & \cellcolor{best}98.2 & \cellcolor{best}98.2 & \cellcolor{best}95.6 & \cellcolor{best}95.6 & \cellcolor{best}95.6 & \cellcolor{worst}94.7 & \cellcolor{best}95.6 & \cellcolor{best}95.6 \\
+        & \textbf{worst} & 95.6 & 95.6 & 93.9 & 94.7 & 94.7 & 95.6 & 91.2 & 91.2 & 91.2 & 91.2 & 91.2 & 91.2 \\
+        & \textbf{avg}   & \cellcolor{best}97.37 & 96.93 & \cellcolor{worst}95.35 & 96.49 & 96.49 & 97.28 & 94.30 & \cellcolor{best}94.56 & \cellcolor{best}94.56 & 93.68 & \cellcolor{worst}93.51 & 94.39 \\
+        & \textbf{std}   & 0.92 & 0.95 & 0.93 & 1.17 & 1.49 & 0.97 & 1.67 & 1.23 & 1.23 & 1.69 & 1.99 & 1.71 \\ \hline
+        \textbf{Time} & \textbf{CPU (s)} & 189.28 & 184.61 & 281.88 & 278.89 & 186.96 & 188.60 & 115.60 & 116.86 & 171.27 & 171.97 & 112.88 & 121.26 \\ \hline
+        \textbf{NFE} & \textbf{number} & 10050 & 10050 & 10050 & 10050 & 10050 & 10050 & 10050 & 10050 & 10050 & 10050 & 10050 & 10050 \\ \hline
+        \textbf{Feat.} & \textbf{avg \#} & 17.8 & 16.9 & 17.8 & 17.9 & 17.6 & 17.0 & 17.1 & 18.2 & 17.3 & 15.2 & 13.7 & 15.2 \\ \hline
+    \end{tabular}
+    }
+    \caption{\textbf{AMDE results on dataset~17 for the mutation strategy selection (cases 22--27).} Same conventions as \tableref{results_AMDE_strategy_d174}.}
+    \label{tab:results_AMDE_strategy_d17}
+\end{table}
+
+\begin{table}[H]
+    \centering
+    \renewcommand{\arraystretch}{1.2}
+    \resizebox{\linewidth}{!}{
+    \begin{tabular}{|c | c | c c c c c c | c c c c c c |}
+        \hline
+        \multicolumn{2}{|c|}{} & \multicolumn{12}{c|}{\textbf{Angle Modulation Differential Evolution [10x]}} \\ \cline{3-14}
+        \multicolumn{2}{|c|}{} & \multicolumn{6}{c|}{\textbf{SVM (heavy model)}} & \multicolumn{6}{c|}{\textbf{kNN (light model)}} \\ \hline
+        \multirow{2}{*}{\textbf{Data}} & \multirow{2}{*}{\diagbox[width=3.2cm, height=1.1cm]{\textbf{Stat.}}{\textbf{Case}}} & \multirow{2}{*}{\textbf{22}} & \multirow{2}{*}{\textbf{23}} & \multirow{2}{*}{\textbf{24}} & \multirow{2}{*}{\textbf{25}} & \multirow{2}{*}{\textbf{26}} & \multirow{2}{*}{\textbf{27}} & \multirow{2}{*}{\textbf{22}} & \multirow{2}{*}{\textbf{23}} & \multirow{2}{*}{\textbf{24}} & \multirow{2}{*}{\textbf{25}} & \multirow{2}{*}{\textbf{26}} & \multirow{2}{*}{\textbf{27}} \\
+        & & & & & & & & & & & & & \\ \hline
+        \multirow{4}{*}{\textbf{Score}}
+        & \textbf{best*} & \cellcolor{best}98.2 & \cellcolor{best}98.2 & \cellcolor{worst}96.5 & \cellcolor{best}98.2 & \cellcolor{best}98.2 & \cellcolor{best}98.2 & \cellcolor{best}95.6 & \cellcolor{best}95.6 & \cellcolor{best}95.6 & \cellcolor{worst}94.7 & \cellcolor{best}95.6 & \cellcolor{best}95.6 \\
+        & \textbf{worst} & 95.6 & 95.6 & 93.9 & 94.7 & 94.7 & 95.6 & 91.2 & 91.2 & 91.2 & 91.2 & 91.2 & 91.2 \\
+        & \textbf{avg}   & \cellcolor{best}97.37 & 96.93 & \cellcolor{worst}95.35 & 96.49 & 96.49 & 97.28 & 94.30 & \cellcolor{best}94.56 & 94.56 & 93.68 & \cellcolor{worst}93.51 & 94.39 \\
+        & \textbf{std}   & 0.92 & 0.95 & 0.93 & 1.17 & 1.49 & 0.97 & 1.67 & 1.23 & 1.23 & 1.69 & 1.99 & 1.71 \\ \hline
+        \textbf{Time} & \textbf{CPU (s)} & 189.28 & 184.61 & 281.88 & 278.89 & 186.96 & 188.60 & 115.60 & 116.86 & 171.27 & 171.97 & 112.88 & 121.26 \\ \hline
+        \textbf{NFE} & \textbf{number} & 10050 & 10050 & 10050 & 10050 & 10050 & 10050 & 10050 & 10050 & 10050 & 10050 & 10050 & 10050 \\ \hline
+        \textbf{Feat.} & \textbf{avg \#} & 17.8 & 16.9 & 17.8 & 17.9 & 17.6 & 17.0 & 17.1 & 18.2 & 17.3 & 15.2 & 13.7 & 15.2 \\ \hline
+    \end{tabular}
+    }
+    \caption{\textbf{AMDE results on dataset~17 for the mutation strategy selection (cases 22--27).} Same conventions as \tableref{results_AMDE_strategy_d174}.}
+    \label{tab:results_AMDE_strategy_d17}
+\end{table}
+
+\begin{table}[H]
+    \centering
+    \renewcommand{\arraystretch}{1.2}
+    \resizebox{\linewidth}{!}{
+    \begin{tabular}{|c | c | c c c c c c | c c c c c c |}
+        \hline
+        \multicolumn{2}{|c|}{} & \multicolumn{12}{c|}{\textbf{Angle Modulation Differential Evolution [10x]}} \\ \cline{3-14}
+        \multicolumn{2}{|c|}{} & \multicolumn{6}{c|}{\textbf{SVM (heavy model)}} & \multicolumn{6}{c|}{\textbf{kNN (light model)}} \\ \hline
+        \multirow{2}{*}{\textbf{Data}} & \multirow{2}{*}{\diagbox[width=3.2cm, height=1.1cm]{\textbf{Stat.}}{\textbf{Case}}} & \multirow{2}{*}{\textbf{22}} & \multirow{2}{*}{\textbf{23}} & \multirow{2}{*}{\textbf{24}} & \multirow{2}{*}{\textbf{25}} & \multirow{2}{*}{\textbf{26}} & \multirow{2}{*}{\textbf{27}} & \multirow{2}{*}{\textbf{22}} & \multirow{2}{*}{\textbf{23}} & \multirow{2}{*}{\textbf{24}} & \multirow{2}{*}{\textbf{25}} & \multirow{2}{*}{\textbf{26}} & \multirow{2}{*}{\textbf{27}} \\
+        & & & & & & & & & & & & & \\ \hline
+        \multirow{4}{*}{\textbf{Score}}
+        & \textbf{best*} & \cellcolor{best}98.2 & 98.2 & \cellcolor{worst}96.5 & 98.2 & 98.2 & 98.2 & \cellcolor{best}95.6 & 95.6 & 95.6 & \cellcolor{worst}94.7 & 95.6 & 95.6 \\
+        & \textbf{worst} & 95.6 & 95.6 & 93.9 & 94.7 & 94.7 & 95.6 & 91.2 & 91.2 & 91.2 & 91.2 & 91.2 & 91.2 \\
+        & \textbf{avg}   & \cellcolor{best}97.37 & 96.93 & \cellcolor{worst}95.35 & 96.49 & 96.49 & 97.28 & 94.30 & \cellcolor{best}94.56 & 94.56 & 93.68 & \cellcolor{worst}93.51 & 94.39 \\
+        & \textbf{std}   & 0.92 & 0.95 & 0.93 & 1.17 & 1.49 & 0.97 & 1.67 & 1.23 & 1.23 & 1.69 & 1.99 & 1.71 \\ \hline
+        \textbf{Time} & \textbf{CPU (s)} & 189.28 & 184.61 & 281.88 & 278.89 & 186.96 & 188.60 & 115.60 & 116.86 & 171.27 & 171.97 & 112.88 & 121.26 \\ \hline
+        \textbf{NFE} & \textbf{number} & 10050 & 10050 & 10050 & 10050 & 10050 & 10050 & 10050 & 10050 & 10050 & 10050 & 10050 & 10050 \\ \hline
+        \textbf{Feat.} & \textbf{avg \#} & 17.8 & 16.9 & 17.8 & 17.9 & 17.6 & 17.0 & 17.1 & 18.2 & 17.3 & 15.2 & 13.7 & 15.2 \\ \hline
+    \end{tabular}
+    }
+    \caption{\textbf{AMDE results on dataset~17 for the mutation strategy selection (cases 22--27).} Same conventions as \tableref{results_AMDE_strategy_d174}.}
+    \label{tab:results_AMDE_strategy_d17}
+\end{table}
+
+\begin{table}[H]
+    \centering
+    \renewcommand{\arraystretch}{1.2}
+    \resizebox{\linewidth}{!}{
+    \begin{tabular}{|c | c | c c c c c c | c c c c c c |}
+        \hline
+        \multicolumn{2}{|c|}{} & \multicolumn{12}{c|}{\textbf{Angle Modulation Differential Evolution [10x]}} \\ \cline{3-14}
+        \multicolumn{2}{|c|}{} & \multicolumn{6}{c|}{\textbf{SVM (heavy model)}} & \multicolumn{6}{c|}{\textbf{kNN (light model)}} \\ \hline
+        \multirow{2}{*}{\textbf{Data}} & \multirow{2}{*}{\diagbox[width=3.2cm, height=1.1cm]{\textbf{Stat.}}{\textbf{Case}}} & \multirow{2}{*}{\textbf{22}} & \multirow{2}{*}{\textbf{23}} & \multirow{2}{*}{\textbf{24}} & \multirow{2}{*}{\textbf{25}} & \multirow{2}{*}{\textbf{26}} & \multirow{2}{*}{\textbf{27}} & \multirow{2}{*}{\textbf{22}} & \multirow{2}{*}{\textbf{23}} & \multirow{2}{*}{\textbf{24}} & \multirow{2}{*}{\textbf{25}} & \multirow{2}{*}{\textbf{26}} & \multirow{2}{*}{\textbf{27}} \\
+        & & & & & & & & & & & & & \\ \hline
+        \multirow{4}{*}{\textbf{Score}}
+        & \textbf{best*} & \cellcolor{best}98.6 & 98.6 & \cellcolor{worst}97.2 & 98.6 & 98.6 & 98.6 & \cellcolor{worst}94.4 & \cellcolor{best}95.8 & 95.8 & 95.8 & 94.4 & 95.8 \\
+        & \textbf{worst} & 93.0 & 93.0 & 93.0 & 91.5 & 94.4 & 94.4 & 85.9 & 87.3 & 90.1 & 88.7 & 87.3 & 87.3 \\
+        & \textbf{avg}   & \cellcolor{worst}95.63 & 96.34 & 96.06 & 95.63 & \cellcolor{best}96.48 & 96.48 & 91.41 & 92.39 & \cellcolor{best}93.10 & 92.54 & \cellcolor{worst}91.27 & 91.69 \\
+        & \textbf{std}   & 1.69 & 1.78 & 1.29 & 2.15 & 1.37 & 1.20 & 3.35 & 2.83 & 1.93 & 2.00 & 2.72 & 2.77 \\ \hline
+        \textbf{Time} & \textbf{CPU (s)} & 236.08 & 226.24 & 253.02 & 250.50 & 225.31 & 204.48 & 124.36 & 128.28 & 156.75 & 150.19 & 131.21 & 115.77 \\ \hline
+        \textbf{NFE} & \textbf{number} & 10050 & 10050 & 10050 & 10050 & 10050 & 10050 & 10050 & 10050 & 10050 & 10050 & 10050 & 10050 \\ \hline
+        \textbf{Feat.} & \textbf{avg \#} & 17.2 & 18.4 & 17.9 & 16.7 & 17.8 & 18.7 & 4.8 & 5.7 & 5.6 & 6.0 & 5.4 & 5.0 \\ \hline
+    \end{tabular}
+    }
+    \caption{\textbf{AMDE results on dataset~52 for the mutation strategy selection (cases 22--27).} Same conventions as \tableref{results_AMDE_strategy_d174}.}
+    \label{tab:results_AMDE_strategy_d52}
+\end{table}
+
+\begin{table}[H]
+    \centering
+    \renewcommand{\arraystretch}{1.2}
+    \resizebox{\linewidth}{!}{
+    \begin{tabular}{|c | c | c c c c c c | c c c c c c |}
+        \hline
+        \multicolumn{2}{|c|}{} & \multicolumn{12}{c|}{\textbf{Angle Modulation Differential Evolution [10x]}} \\ \cline{3-14}
+        \multicolumn{2}{|c|}{} & \multicolumn{6}{c|}{\textbf{SVM (heavy model)}} & \multicolumn{6}{c|}{\textbf{kNN (light model)}} \\ \hline
+        \multirow{2}{*}{\textbf{Data}} & \multirow{2}{*}{\diagbox[width=3.2cm, height=1.1cm]{\textbf{Stat.}}{\textbf{Case}}} & \multirow{2}{*}{\textbf{22}} & \multirow{2}{*}{\textbf{23}} & \multirow{2}{*}{\textbf{24}} & \multirow{2}{*}{\textbf{25}} & \multirow{2}{*}{\textbf{26}} & \multirow{2}{*}{\textbf{27}} & \multirow{2}{*}{\textbf{22}} & \multirow{2}{*}{\textbf{23}} & \multirow{2}{*}{\textbf{24}} & \multirow{2}{*}{\textbf{25}} & \multirow{2}{*}{\textbf{26}} & \multirow{2}{*}{\textbf{27}} \\
+        & & & & & & & & & & & & & \\ \hline
+        \multirow{4}{*}{\textbf{Score}}
+        & \textbf{best*} & 88.1 & 88.1 & 88.1 & 88.1 & 88.1 & 88.1 & \cellcolor{worst}83.3 & \cellcolor{best}90.5 & 85.7 & 83.3 & 88.1 & 85.7 \\
+        & \textbf{worst} & 78.6 & 78.6 & 76.2 & 78.6 & 81.0 & 81.0 & 66.7 & 71.4 & 69.0 & 69.0 & 73.8 & 64.3 \\
+        & \textbf{avg}   & \cellcolor{best}84.29 & 84.05 & 83.81 & 84.29 & 84.29 & \cellcolor{worst}82.86 & 78.33 & 79.29 & 78.33 & 78.33 & \cellcolor{best}81.19 & \cellcolor{worst}77.14 \\
+        & \textbf{std}   & 3.40 & 3.18 & 3.51 & 3.40 & 2.01 & 2.46 & 4.69 & 6.25 & 5.08 & 4.69 & 4.95 & 5.75 \\ \hline
+        \textbf{Time} & \textbf{CPU (s)} & 253.25 & 241.46 & 250.91 & 263.87 & 251.50 & 235.05 & 168.21 & 166.14 & 172.58 & 181.06 & 165.17 & 164.10 \\ \hline
+        \textbf{NFE} & \textbf{number} & 10050 & 10050 & 10050 & 10050 & 10050 & 10050 & 10050 & 10050 & 10050 & 10050 & 10050 & 10050 \\ \hline
+        \textbf{Feat.} & \textbf{avg \#} & 27.8 & 27.3 & 27.9 & 28.8 & 28.3 & 27.6 & 29.4 & 31.7 & 28.0 & 27.1 & 24.2 & 31.4 \\ \hline
+    \end{tabular}
+    }
+    \caption{\textbf{AMDE results on dataset~151 for the mutation strategy selection (cases 22--27).} Same conventions as \tableref{results_AMDE_strategy_d174}.}
+    \label{tab:results_AMDE_strategy_d151}
+\end{table}
+
+To sum up, $Strat^{**} = best/1$
+
+\subsubsection{Simulated Annealing}\label{sec:simulated_annealing_parameters}
+
+\paragraph{Parameters}
+
+to come
+
+\subsubsection{Particle Swarm Optimization}
+
+\subsection{Summary of the parameters}\label{sec:summary_parameters}
+
+\section{Solving the permutation flowshop scheduling problem}\label{sec:results_analysis}
+
+\subsection{Comparison of all methods on every instances}\label{sec:main_comparison}
+
+\subsection{Convergence of Evolutionary Algorithm}
+
+\subsection{Best sequences found}
+
+
+
+\newpage
+\addcontentsline{toc}{section}{Conclusion}
+\section*{Conclusion}
+
+\addcontentsline{toc}{section}{References}
+\section*{References}
+\printbibliography[sorting=nyt, heading=none]
+
+\newpage
+\addcontentsline{toc}{section}{Appendixes}
+\section*{Appendixes}
+
+
+\addcontentsline{toc}{subsection}{List of Tables}
+
+\listoftables
+
+\addcontentsline{toc}{subsection}{List of Figures}
+
+\listoffigures
+
+\addcontentsline{toc}{subsection}{List of Algorithms}
+
+\listofalgorithms
+
+\addcontentsline{toc}{subsection}{List of Listings}
+
+\lstlistoflistings
+
+
+\end{document} 

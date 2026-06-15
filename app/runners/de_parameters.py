@@ -12,17 +12,59 @@ for env_var in (
 import numpy as np
 
 from app.decoders import build_decoder
+from app.monitoring import MonitoringMetric
 from app.differential_evolution.algorithm import DifferentialEvolution
-from app.differential_evolution.featureselection import FeatureSelectionProblem
-from app.Problem.Problem import Problem
+from app.differential_evolution.featureselection import DecodedFeatureSelectionProblem
+from app.Problem import Problem
 from app.Utilities.ConfigLoader import load_config
 from app.runners.common import (
     build_run_configs,
     run_parallel_configs,
-    CSV_SCHEMA,
+    run_sequential_configs,
+    save_raw_run_result,
 )
 
-TIMING_METRICS = ["elapsed_time_ns", "cpu_time_ns"]
+DE_CSV_SCHEMA = [
+    {"column": "Case_ID", "key": "case_id"},
+    {"column": "Dataset_ID", "key": "dataset_id"},
+    {"column": "Strategy", "key": "strategy"},
+    {"column": "Population_size", "key": "popsize"},
+    {"column": "Generations_number", "key": "max_generations"},
+    {"column": "Seed", "key": "base_seed"},
+    {"column": "Decoder", "key": "decoder_name"},
+    {"column": "Evaluator", "key": "evaluation_model"},
+    {"column": "Fitness", "key": "fitness_name"},
+    {"column": "Alpha", "key": "alpha"},
+    {"column": "CV_Folds", "key": "cv_folds"},
+    {"column": "Best", "key": "score_best", "digits": 1},
+    {"column": "Worst", "key": "score_worst", "digits": 1},
+    {"column": "Avg", "key": "score_avg", "digits": 2},
+    {"column": "Std", "key": "score_std", "digits": 2},
+    {"column": "Wall_Time_Avg(s)", "key": "wall_avg_s", "digits": 3},
+    {"column": "CPU_Time_Avg(s)", "key": "cpu_avg_s", "digits": 3},
+    {"column": "NFE_Avg", "key": "nfe_avg", "digits": 1},
+    {"column": "Champion_Score", "key": "champion_score", "digits": 2},
+    {"column": "Champion_Features", "key": "champion_features"},
+    {"column": "Nb_Features_Keep", "key": "nb_features_keep", "digits": 2},
+]
+
+DE_GROUP_FIELDS = [
+    "case_id", "dataset_id", "strategy", "popsize", "max_generations",
+    "decoder_name", "evaluation_model", "fitness_name", "alpha", "cv_folds",
+]
+DE_RESUME_FIELDS = list(DE_GROUP_FIELDS)
+
+TIMING_METRICS = [
+    MonitoringMetric.ELAPSED_TIME_NS.value,
+    MonitoringMetric.CPU_TIME_NS.value,
+]
+RAW_MONITORING_METRICS = [
+    MonitoringMetric.BEST_MASK.value,
+    MonitoringMetric.WORST_MASK.value,
+    MonitoringMetric.POPULATION_DIVERSITY.value,
+    MonitoringMetric.BEST_FITNESS.value,
+    MonitoringMetric.EVALUATION_COUNT.value,
+]
 
 def run_de_config(config):
     print(
@@ -42,14 +84,13 @@ def run_de_config(config):
     problem = Problem.load_dataset(dataset_id, evaluation_config)
 
     decoder_config = dict(config["decoder"])
-    decoder_config["seed"] = config["seed"]
     decoder = build_decoder(decoder_config)
-    de_problem = FeatureSelectionProblem(problem, decoder)
+    de_problem = DecodedFeatureSelectionProblem(problem, decoder)
 
     de_config = dict(config)
     monitoring = dict(de_config.get("monitoring", {}))
     monitoring_metrics = list(monitoring.get("metrics", []))
-    for metric in TIMING_METRICS:
+    for metric in TIMING_METRICS + RAW_MONITORING_METRICS:
         if metric not in monitoring_metrics:
             monitoring_metrics.append(metric)
     monitoring["metrics"] = monitoring_metrics
@@ -63,8 +104,37 @@ def run_de_config(config):
     if result.cpu_ns is None:
         raise ValueError("DE result is missing cpu_ns timing data.")
 
-    best_mask = de_problem.decode(np.asarray(result.best, dtype=float))
+    best_mask = np.asarray(result.best_mask, dtype=int)
     final_score = float(problem.evaluate_final(best_mask) * 100)
+
+    raw_dir = "app/Results/raw"
+    raw_filename = "cases_AMDE_Table9_F_CR_Sweep.jsonl"
+    raw_data = {
+        "config": {
+            "case_id": config["case_id"],
+            "dataset_id": dataset_id,
+            "popsize": config["popsize"],
+            "strategy": config["strategy"],
+            "max_generations": config["max_generations"],
+            "base_seed": config["base_seed"],
+            "seed": config["seed"],
+            "decoder_name": decoder.name,
+            "evaluation_model": evaluation_config["evaluation_model"],
+            "fitness_name": evaluation_config["fitness"],
+            "alpha": evaluation_config["alpha"],
+            "cv_folds": evaluation_config["cv_folds"],
+        },
+        "summary": {
+            "best_fitness": float(result.best_fitness),
+            "final_score": final_score,
+            "nb_features_keep": int(best_mask.sum()),
+            "elapsed_wall_s": float(result.wall_ns / 1_000_000_000),
+            "elapsed_cpu_s": float(result.cpu_ns / 1_000_000_000),
+            "evaluations_count": result.evaluations,
+        },
+        "history": result.history,
+    }
+    save_raw_run_result(raw_dir, raw_data, raw_filename)
 
     return {
         "run_id": config["run_id"],
@@ -81,13 +151,13 @@ def run_de_config(config):
         "fitness_name": evaluation_config["fitness"],
         "alpha": evaluation_config["alpha"],
         "cv_folds": evaluation_config["cv_folds"],
-        "best_vector": np.asarray(result.best, dtype=float),
+        "best_vector": np.asarray(result.best_vector, dtype=float),
         "best_fitness": float(result.best_fitness),
         "final_score": final_score,
         "nb_features_keep": int(best_mask.sum()),
         "elapsed_wall_s": float(result.wall_ns / 1_000_000_000),
         "elapsed_cpu_s": float(result.cpu_ns / 1_000_000_000),
-        "evaluations_count": de_problem.evaluations_count,
+        "evaluations_count": result.evaluations,
     }
 
 class DEParameters:
@@ -97,28 +167,44 @@ class DEParameters:
         self.runs_per_algo = self.config.get("runs_per_algo", 10)
         self.max_workers = self.config.get(
             "de_max_workers",
-            max(1, min(4, os.cpu_count() or 4)),
+            max(1, min(14, os.cpu_count() or 14)),
         )
-        self.cases = self.config.get("cases_DE_strategy", [])
+        self.cases = self.config.get("cases_AMDE_Table9_F_CR_Sweep", [])
+    
         self.evaluation_cases = self.config.get("evaluation_cases", [{
             "evaluation_model": "svm",
             "fitness": "weighted_error",
             "alpha": 0.5,
             "cv_folds": 5,
         }])
+        
+        self.csv_filepath = "app/Results/SAParameters/AMDE_Table9_F_CR_Sweep.csv"
+        
+        #self.dataset_ids = [0]
+        #self.cases = [self.cases[0]]
+        #self.cases[0]["max_generations"] = 10
+        #self.runs_per_algo = 2 
+        #self.csv_filepath = "app/Results/SAParameters/test.csv"
+    
+
     
         self.configurations = list(build_run_configs(self.dataset_ids, self.cases, self.evaluation_cases, self.runs_per_algo))
-        self.csv_filepath = "app/Results/SAParameters/DEParameters4_test.csv"
-    
-    def run_all(self):
+        
+    def run_all_parallel(self):
         run_parallel_configs(
-            self.configurations, run_de_config, self.csv_filepath, CSV_SCHEMA,
-            group_columns=[
-                "case_id", "dataset_id", "popsize", "max_generations",
-                "decoder_name", "evaluation_model", "fitness_name", "alpha", "cv_folds",
-            ],
+            self.configurations, run_de_config, self.csv_filepath, DE_CSV_SCHEMA,
+            group_fields=DE_GROUP_FIELDS,
+            resume_fields=DE_RESUME_FIELDS,
             max_workers=self.max_workers,
+        )   
+        
+    def run_all_sequential(self):
+        run_sequential_configs(
+            self.configurations, run_de_config, self.csv_filepath, DE_CSV_SCHEMA,
+            group_fields=DE_GROUP_FIELDS,
+            resume_fields=DE_RESUME_FIELDS,
         )
+
 
     def run_profile_config(
         self,
@@ -150,4 +236,5 @@ class DEParameters:
 
 if __name__ == "__main__":
     runner = DEParameters()
-    runner.run_all()
+    #runner.run_all_sequential()
+    runner.run_all_parallel()
