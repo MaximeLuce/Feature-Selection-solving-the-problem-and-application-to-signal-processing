@@ -85,6 +85,17 @@ def append_csv_rows(csv_filepath, columns, rows):
             )
 
 
+def write_csv_rows(csv_filepath, columns, rows):
+    directory = os.path.dirname(csv_filepath)
+    if directory:
+        os.makedirs(directory, exist_ok=True)
+    with open(csv_filepath, mode="w", newline="") as file:
+        writer = csv.DictWriter(file, fieldnames=columns, delimiter=";")
+        writer.writeheader()
+        for row in rows:
+            writer.writerow(validate_and_order_row(row, columns))
+
+
 def save_raw_run_result(raw_dir, result_dict, filename):
     os.makedirs(raw_dir, exist_ok=True)
     filepath = os.path.join(raw_dir, filename)
@@ -92,6 +103,13 @@ def save_raw_run_result(raw_dir, result_dict, filename):
     with lock:
         with open(filepath, "a", encoding="utf-8") as file:
             file.write(json.dumps(result_dict) + "\n")
+
+
+def build_rebuilt_csv_path(csv_filepath, suffix="_rebuilt"):
+    root, ext = os.path.splitext(csv_filepath)
+    if not ext:
+        ext = ".csv"
+    return f"{root}{suffix}{ext}"
 
 
 def _completed_group_keys(csv_filepath, key_columns, csv_schema):
@@ -152,6 +170,59 @@ def summarize_results_group(group_results, group_fields):
     return summary
 
 
+def _group_results_by_fields(results, group_fields):
+    grouped = {}
+    for result in results:
+        key = tuple(str(result.get(field, "")) for field in group_fields)
+        grouped.setdefault(key, []).append(result)
+    return grouped
+
+
+def _result_from_raw_record(raw_record):
+    if "config" not in raw_record or "summary" not in raw_record:
+        raise ValueError("Raw record must contain both 'config' and 'summary'.")
+
+    result = dict(raw_record["config"])
+    result.update(raw_record["summary"])
+    return result
+
+
+def rebuild_grouped_csv_from_raw(
+    raw_filepath,
+    csv_filepath,
+    csv_schema,
+    group_fields,
+    output_csv_filepath=None,
+):
+    if not os.path.isfile(raw_filepath):
+        raise FileNotFoundError(f"Raw results file not found: {raw_filepath}")
+
+    rebuilt_csv_filepath = output_csv_filepath or build_rebuilt_csv_path(csv_filepath)
+    results = []
+    with open(raw_filepath, encoding="utf-8") as file:
+        for line_number, line in enumerate(file, start=1):
+            record_text = line.strip()
+            if not record_text:
+                continue
+            try:
+                raw_record = json.loads(record_text)
+            except json.JSONDecodeError as exc:
+                raise ValueError(
+                    f"Invalid JSON on line {line_number} of {raw_filepath}."
+                ) from exc
+            results.append(_result_from_raw_record(raw_record))
+
+    grouped = _group_results_by_fields(results, group_fields)
+    rows = []
+    for group_results in grouped.values():
+        values = summarize_results_group(group_results, group_fields)
+        rows.append(build_row_from_schema(values, csv_schema))
+
+    columns = [item["column"] for item in csv_schema]
+    write_csv_rows(rebuilt_csv_filepath, columns, rows)
+    return rebuilt_csv_filepath
+
+
 def _pending_groups(configurations, group_fields, csv_schema, csv_filepath):
     completed = _completed_group_keys(csv_filepath, group_fields, csv_schema)
     grouped = {}
@@ -172,12 +243,11 @@ def _pending_groups(configurations, group_fields, csv_schema, csv_filepath):
 def _collect_result(
     result, config, results, expected_counts, pbar, group_fields, csv_schema, csv_filepath
 ):
-    
     columns = [item["column"] for item in csv_schema]
     group_id = config["group_id"]
     expected = expected_counts[group_id]
-    finished = len(results[group_id])
     results[group_id].append(result)
+    finished = len(results[group_id])
     pbar.update(1)
     tqdm.write(
         "Run finished: "

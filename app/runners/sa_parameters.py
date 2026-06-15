@@ -16,7 +16,9 @@ from app.OptimizationAlgorithm.SimulatedAnnealing import SimulatedAnnealing
 from app.Problem.Problem import Problem
 from app.Utilities.ConfigLoader import load_config
 from app.runners.common import (
+    build_rebuilt_csv_path,
     build_run_configs,
+    rebuild_grouped_csv_from_raw,
     run_configs,
     save_raw_run_result,
 )
@@ -62,6 +64,8 @@ SA_MONITORING_METRICS = [
     MonitoringMetric.ACCEPTANCE_RATE.value,
     MonitoringMetric.FINAL_TEMPERATURE.value,
 ]
+RAW_DIR = "app/Results/raw"
+RAW_FILENAME = "SA_raw_cases_SA_Table10.jsonl"
 
 
 def run_sa_config(config):
@@ -91,8 +95,6 @@ def run_sa_config(config):
     final_score = float(problem.evaluate_final(best_mask) * 100)
 
     # Append raw result to shared JSONL file
-    raw_dir = "app/Results/raw"
-    raw_filename = "SA_raw_cases_SA_Table10.jsonl"
     raw_data = {
         "config": {
             "case_id": config["case_id"],
@@ -118,7 +120,7 @@ def run_sa_config(config):
         },
         "history": result.history,
     }
-    save_raw_run_result(raw_dir, raw_data, raw_filename)
+    save_raw_run_result(RAW_DIR, raw_data, RAW_FILENAME)
 
     return {
         "run_id": config["run_id"],
@@ -175,6 +177,17 @@ class SAParameters:
             configurations, run_sa_config, self.csv_filepath, SA_CSV_SCHEMA,
             group_fields=SA_GROUP_FIELDS,
             max_workers=14
+        )
+
+    def rebuild_summary_from_raw(self, output_csv_filepath=None):
+        raw_filepath = os.path.join(RAW_DIR, RAW_FILENAME)
+        rebuilt_csv_filepath = output_csv_filepath or build_rebuilt_csv_path(self.csv_filepath)
+        return rebuild_grouped_csv_from_raw(
+            raw_filepath=raw_filepath,
+            csv_filepath=self.csv_filepath,
+            csv_schema=SA_CSV_SCHEMA,
+            group_fields=SA_GROUP_FIELDS,
+            output_csv_filepath=rebuilt_csv_filepath,
         )
 
 

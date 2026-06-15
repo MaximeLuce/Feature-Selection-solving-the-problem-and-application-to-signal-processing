@@ -18,7 +18,9 @@ from app.differential_evolution.featureselection import DecodedFeatureSelectionP
 from app.Problem import Problem
 from app.Utilities.ConfigLoader import load_config
 from app.runners.common import (
+    build_rebuilt_csv_path,
     build_run_configs,
+    rebuild_grouped_csv_from_raw,
     run_configs,
     save_raw_run_result,
 )
@@ -63,6 +65,8 @@ RAW_MONITORING_METRICS = [
     MonitoringMetric.BEST_FITNESS.value,
     MonitoringMetric.EVALUATION_COUNT.value,
 ]
+RAW_DIR = "app/Results/raw"
+RAW_FILENAME = "cases_BDE_Table6_F_CR_Sweep.jsonl"
 
 def run_de_config(config):
     print(
@@ -105,8 +109,6 @@ def run_de_config(config):
     best_mask = np.asarray(result.best_mask, dtype=int)
     final_score = float(problem.evaluate_final(best_mask) * 100)
 
-    raw_dir = "app/Results/raw"
-    raw_filename = "cases_BDE_Table6_F_CR_Sweep.jsonl"
     raw_data = {
         "config": {
             "case_id": config["case_id"],
@@ -132,7 +134,7 @@ def run_de_config(config):
         },
         "history": result.history,
     }
-    save_raw_run_result(raw_dir, raw_data, raw_filename)
+    save_raw_run_result(RAW_DIR, raw_data, RAW_FILENAME)
 
     return {
         "run_id": config["run_id"],
@@ -195,6 +197,17 @@ class DEParameters:
             parallel=parallel,
             max_workers=self.max_workers,
         )   
+
+    def rebuild_summary_from_raw(self, output_csv_filepath=None):
+        raw_filepath = os.path.join(RAW_DIR, RAW_FILENAME)
+        rebuilt_csv_filepath = output_csv_filepath or build_rebuilt_csv_path(self.csv_filepath)
+        return rebuild_grouped_csv_from_raw(
+            raw_filepath=raw_filepath,
+            csv_filepath=self.csv_filepath,
+            csv_schema=DE_CSV_SCHEMA,
+            group_fields=DE_GROUP_FIELDS,
+            output_csv_filepath=rebuilt_csv_filepath,
+        )
 
 
 if __name__ == "__main__":

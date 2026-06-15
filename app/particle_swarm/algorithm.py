@@ -9,9 +9,9 @@ from .results import NBPSOResult
 class NewBinaryParticleSwarmOptimization:
     DEFAULT_CONFIG = {
         "swarm_size": 50,
-        "w": 0.7,
-        "c1": 1.5,
-        "c2": 1.5,
+        "w": 0.729,
+        "c1": 1.49445,
+        "c2": 1.49445,
         "vmax": 4.0,
         "max_generations": 100,
         "seed": None,
