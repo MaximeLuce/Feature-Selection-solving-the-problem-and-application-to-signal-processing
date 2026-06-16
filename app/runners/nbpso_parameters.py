@@ -28,6 +28,8 @@ NBPSO_CSV_SCHEMA = [
     {"column": "Dataset_ID", "key": "dataset_id"},
     {"column": "Swarm_Size", "key": "swarm_size"},
     {"column": "W", "key": "w", "digits": 3},
+    {"column": "W_Max", "key": "w_max", "digits": 3},
+    {"column": "W_Min", "key": "w_min", "digits": 3},
     {"column": "C1", "key": "c1", "digits": 3},
     {"column": "C2", "key": "c2", "digits": 3},
     {"column": "Vmax", "key": "vmax", "digits": 3},
@@ -50,7 +52,7 @@ NBPSO_CSV_SCHEMA = [
 ]
 
 NBPSO_GROUP_FIELDS = [
-    "case_id", "dataset_id", "swarm_size", "w", "c1", "c2", "vmax",
+    "case_id", "dataset_id", "swarm_size", "w", "w_max", "w_min", "c1", "c2", "vmax",
     "max_generations", "evaluation_model", "fitness_name", "alpha", "cv_folds",
 ]
 
@@ -66,7 +68,7 @@ RAW_MONITORING_METRICS = [
     MonitoringMetric.POPULATION_DIVERSITY.value,
 ]
 RAW_DIR = "app/Results/raw"
-RAW_FILENAME = "NBPSO_raw.jsonl"
+RAW_FILENAME = "cases_NBPSO_Table14_LDIW.jsonl"
 
 def run_nbpso_config(config):
     print(
@@ -103,13 +105,24 @@ def run_nbpso_config(config):
 
     best_mask = np.asarray(result.best_mask, dtype=int)
     final_score = float(problem.evaluate_final(best_mask) * 100)
+    w = config["w"]
+    w_max = 0.0
+    w_min = 0.0
+    if isinstance(w, dict):
+        w_max = w.get("w_max", 0.9)
+        w_min = w.get("w_min", 0.4)
+        w = 0.0
+        
+        
 
     raw_data = {
         "config": {
             "case_id": config["case_id"],
             "dataset_id": dataset_id,
             "swarm_size": config["swarm_size"],
-            "w": config["w"],
+            "w": w,
+            "w_max": w_max,
+            "w_min": w_min,
             "c1": config["c1"],
             "c2": config["c2"],
             "vmax": config.get("vmax", 4.0),
@@ -138,7 +151,9 @@ def run_nbpso_config(config):
         "case_id": config["case_id"],
         "dataset_id": dataset_id,
         "swarm_size": config["swarm_size"],
-        "w": config["w"],
+        "w": w,
+        "w_max": w_max,
+        "w_min": w_min,
         "c1": config["c1"],
         "c2": config["c2"],
         "vmax": config.get("vmax", 4.0),
@@ -167,14 +182,14 @@ class NBPSOParameters:
             "nbpso_max_workers",
             max(1, min(14, os.cpu_count() or 14)),
         )
-        self.cases = self.config.get("cases_NBPSO_Table11_Swarm_Generations", [])
+        self.cases = self.config.get("cases_NBPSO_Table14_LDIW", [])
         self.evaluation_cases = self.config.get("evaluation_cases", [{
             "evaluation_model": "svm",
             "fitness": "weighted_error",
             "alpha": 0.5,
             "cv_folds": 5,
         }])
-        self.csv_filepath = "app/Results/SAParameters/NBPSOParameters.csv"
+        self.csv_filepath = "app/Results/SAParameters/NBPSO_Table14_LDIW.csv"
         
         self.configurations = list(build_run_configs(
             self.dataset_ids,

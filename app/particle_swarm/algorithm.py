@@ -41,6 +41,15 @@ class NewBinaryParticleSwarmOptimization:
             raise ValueError(f"max_generations must be >= 1, got {self.max_generations}.")
         if self.vmax <= 0:
             raise ValueError(f"vmax must be > 0, got {self.vmax}.")
+        
+        if isinstance(self.w, float):
+            self.inertia = "constant"
+        elif isinstance(self.w, dict):
+            self.inertia = "linear"
+            if self.w.get("w_max") is None or self.w.get("w_min") is None:
+                raise ValueError("w must contain 'w_max' and 'w_min' keys.")
+        else:
+            raise ValueError(f"w must be float or dict, got {self.w}.")
 
         self.monitor = Monitor(config.get("monitoring", self.DEFAULT_CONFIG["monitoring"]))
         self.generator = np.random.default_rng(self.seed)
@@ -85,6 +94,12 @@ class NewBinaryParticleSwarmOptimization:
             self.best = self.personal_best_positions[best_idx].copy()
             self.best_fitness = float(self.personal_best_fitness[best_idx])
 
+    def _get_inertia(self):
+        if self.inertia == "constant":
+            return self.w
+        elif self.inertia == "linear":
+            return self.w["w_max"] + (self.w["w_max"] - self.w["w_min"]) * self.generation / self.max_generations
+        
     def _update_velocities(self):
         r1 = self.generator.random((self.swarm_size, self.num_features))
         r2 = self.generator.random((self.swarm_size, self.num_features))
@@ -104,12 +119,12 @@ class NewBinaryParticleSwarmOptimization:
         global_to_zero = -global_to_one
 
         self.velocities_to_one = np.clip(
-            self.w * self.velocities_to_one + personal_to_one + global_to_one,
+            self._get_inertia() * self.velocities_to_one + personal_to_one + global_to_one,
             -self.vmax,
             self.vmax,
         )
         self.velocities_to_zero = np.clip(
-            self.w * self.velocities_to_zero + personal_to_zero + global_to_zero,
+            self._get_inertia() * self.velocities_to_zero + personal_to_zero + global_to_zero,
             -self.vmax,
             self.vmax,
         )
@@ -136,13 +151,13 @@ class NewBinaryParticleSwarmOptimization:
         self.monitor.record_population(fitness, self.positions.copy())
 
         while not self._stop():
-            self.generation += 1
             self._update_velocities()
             self._update_positions()
             fitness = self.problem.evaluate_batch(self.positions)
             self._update_personal_best(fitness)
             self._update_global_best()
             self.monitor.record_population(fitness, self.positions.copy())
+            self.generation += 1
 
         self.monitor.finish(self.generation, self.best_fitness, self.problem.evaluations_count)
         monitor_result = self.monitor.build_result_fields()

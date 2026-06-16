@@ -722,5 +722,46 @@
             "c2": 1,
             "vmax": 4.0
         }
+    ],
+    "cases_NBPSO_Table14_LDIW": [
+        {
+            "id": "63",
+            "swarm_size": 100,
+            "max_generations": 100,
+            "seed": 42,
+            "w": {
+                "w_max": 0.9,
+                "w_min": 0.5
+            },
+            "c1": 1,
+            "c2": 1,
+            "vmax": 4.0
+        },
+        {
+            "id": "64",
+            "swarm_size": 100,
+            "max_generations": 100,
+            "seed": 42,
+            "w": {
+                "w_max": 0.9,
+                "w_min": 0.4
+            },
+            "c1": 1,
+            "c2": 1,
+            "vmax": 4.0
+        },
+        {
+            "id": "65",
+            "swarm_size": 100,
+            "max_generations": 100,
+            "seed": 42,
+            "w": {
+                "w_max": 0.9,
+                "w_min": 0.2
+            },
+            "c1": 1,
+            "c2": 1,
+            "vmax": 4.0
+        }
     ]
 }
