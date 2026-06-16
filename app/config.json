@@ -703,23 +703,23 @@
     ],
     "cases_NBPSO_Table13_Inertia": [
         {
-            "id": "nbpso_1",
-            "swarm_size": 50,
-            "max_generations": 200,
+            "id": "61",
+            "swarm_size": 100,
+            "max_generations": 100,
             "seed": 42,
-            "w": 0.7,
-            "c1": 1.5,
-            "c2": 1.5,
+            "w": 0.9,
+            "c1": 1,
+            "c2": 1,
             "vmax": 4.0
         },
         {
-            "id": "nbpso_1",
-            "swarm_size": 50,
-            "max_generations": 200,
+            "id": "62",
+            "swarm_size": 100,
+            "max_generations": 100,
             "seed": 42,
-            "w": 0.7,
-            "c1": 1.5,
-            "c2": 1.5,
+            "w": 0.4,
+            "c1": 1,
+            "c2": 1,
             "vmax": 4.0
         }
     ]
