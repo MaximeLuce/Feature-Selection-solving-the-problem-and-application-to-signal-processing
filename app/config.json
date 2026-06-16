@@ -401,8 +401,8 @@
             "seed": 42,
             "strategy": "best/1",
             "F1": 0.5,
-            "F2": 0.7,
-            "CR": 0.5,
+            "F2": 0.5,
+            "CR": 0.7,
             "decoder": {
                 "name": "sigma",
                 "bounds": [-6.0, 6.0]
@@ -671,6 +671,38 @@
     ],
     "cases_NBPSO_Table12_Acceleration": [
         {
+            "id": "58",
+            "swarm_size": 100,
+            "max_generations": 100,
+            "seed": 42,
+            "w": 0.729,
+            "c1": 1.9,
+            "c2": 1,
+            "vmax": 4.0
+        },
+        {
+            "id": "59",
+            "swarm_size": 100,
+            "max_generations": 100,
+            "seed": 42,
+            "w": 0.729,
+            "c1": 1,
+            "c2": 1.9,
+            "vmax": 4.0
+        },
+        {
+            "id": "60",
+            "swarm_size": 100,
+            "max_generations": 100,
+            "seed": 42,
+            "w": 0.729,
+            "c1": 1,
+            "c2": 1,
+            "vmax": 4.0
+        }
+    ],
+    "cases_NBPSO_Table13_Inertia": [
+        {
             "id": "nbpso_1",
             "swarm_size": 50,
             "max_generations": 200,
@@ -679,9 +711,7 @@
             "c1": 1.5,
             "c2": 1.5,
             "vmax": 4.0
-        }
-    ],
-    "cases_NBPSO_Table13_Inertia": [
+        },
         {
             "id": "nbpso_1",
             "swarm_size": 50,
