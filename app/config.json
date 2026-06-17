@@ -1,39 +1,42 @@
 {
-    "dataset_ids": [174, 17, 52, 151, 0],
+    "dataset_ids": [174, 17, 52, 151],
 
     "runs_per_algo": 10,
-    "total_evals": 100000,
+    "total_evals": 10000,
     "evaluation_cases": [
         {
             "evaluation_model": "svm",
-            "fitness": "weighted_error",
+            "fitness": "error",
             "alpha": 0.5,
             "cv_folds": 5
         },
         {
             "evaluation_model": "knn",
-            "fitness": "weighted_error",
+            "fitness": "error",
             "alpha": 0.5,
             "cv_folds": 5
         }
     ],
 
-    "cases_SA_initial_temp": [
-        {"id": "1", "initial_temp": 100, "cooling_rate": 0.99},
-        {"id": "2", "initial_temp": 1000, "cooling_rate": 0.99},
-        {"id": "3", "initial_temp": 10000, "cooling_rate": 0.99}
-    ],
-    "cases_SA_cooling_rate": [
-        {"id": "4", "initial_temp": 1000, "cooling_rate": 0.90},
-        {"id": "5", "initial_temp": 1000, "cooling_rate": 0.99},
-        {"id": "6", "initial_temp": 1000, "cooling_rate": 0.999},
-        {"id": "7", "initial_temp": 1000, "cooling_rate": 0.9999}
+    "cases_SA_Table10": [
+        {"id": "43", "initial_temp": 0.001, "cooling_rate": 0.999, "seed": 42},
+        {"id": "44", "initial_temp": 0.001, "cooling_rate": 0.9995, "seed": 42},
+        {"id": "45", "initial_temp": 0.001, "cooling_rate": 0.9999, "seed": 42},
+        {"id": "46", "initial_temp": 0.01 , "cooling_rate": 0.999, "seed": 42},
+        {"id": "47", "initial_temp": 0.01, "cooling_rate": 0.9995, "seed": 42},
+        {"id": "48", "initial_temp": 0.01, "cooling_rate": 0.9999, "seed": 42},
+        {"id": "49", "initial_temp": 0.1, "cooling_rate": 0.999, "seed": 42},
+        {"id": "50", "initial_temp": 0.1, "cooling_rate": 0.9995, "seed": 42},
+        {"id": "51", "initial_temp": 0.1, "cooling_rate": 0.9999, "seed": 42},
+        {"id": "52", "initial_temp": 1, "cooling_rate": 0.999, "seed": 42},
+        {"id": "53", "initial_temp": 1, "cooling_rate": 0.9995, "seed": 42},
+        {"id": "54", "initial_temp": 1, "cooling_rate": 0.9999, "seed": 42}
     ],
     "cases_DE_test": [
         {
-            "id": "rand/1",
+            "id": "1",
             "popsize": 50,
-            "max_generations": 10,
+            "max_generations": 1,
             "seed": 42,
             "strategy": "rand/1",
             "F1": 0.5,
@@ -45,9 +48,9 @@
             }
         }
     ],
-    "cases_DE_strategy": [
+    "cases_BDE_AMDE_Table4_Table7_StrategySweep": [
         {
-            "id": "BDE/rand/1",
+            "id": "1",
             "popsize": 50,
             "max_generations": 200,
             "seed": 42,
@@ -61,7 +64,7 @@
             }
         },
         {
-            "id": "BDE/rand/2",
+            "id": "2",
             "popsize": 50,
             "max_generations": 200,
             "seed": 42,
@@ -75,7 +78,7 @@
             }
         },
         {
-            "id": "BDE/best/1",
+            "id": "3",
             "popsize": 50,
             "max_generations": 200,
             "seed": 42,
@@ -89,7 +92,7 @@
             }
         },
         {
-            "id": "BDE/best/2",
+            "id": "4",
             "popsize": 50,
             "max_generations": 200,
             "seed": 42,
@@ -103,11 +106,11 @@
             }
         },
         {
-            "id": "BDE/current-to-best/1",
+            "id": "5",
             "popsize": 50,
             "max_generations": 200,
             "seed": 42,
-            "strategy": "best/2",
+            "strategy": "current-to-rand/1",
             "F1": 0.5,
             "F2": 0.5,
             "CR": 0.5,
@@ -117,11 +120,11 @@
             }
         },
         {
-            "id": "BDE/current-to-rand/1",
+            "id": "6",
             "popsize": 50,
             "max_generations": 200,
             "seed": 42,
-            "strategy": "best/2",
+            "strategy": "current-to-best/1",
             "F1": 0.5,
             "F2": 0.5,
             "CR": 0.5,
@@ -131,7 +134,7 @@
             }
         },
         {
-            "id": "AMDE/rand/1",
+            "id": "17",
             "popsize": 50,
             "max_generations": 200,
             "seed": 42,
@@ -144,7 +147,7 @@
             }
         },
         {
-            "id": "AMDE/rand/2",
+            "id": "18",
             "popsize": 50,
             "max_generations": 200,
             "seed": 42,
@@ -157,7 +160,7 @@
             }
         },
         {
-            "id": "AMDE/best/1",
+            "id": "19",
             "popsize": 50,
             "max_generations": 200,
             "seed": 42,
@@ -170,7 +173,7 @@
             }
         },
         {
-            "id": "AMDE/best/2",
+            "id": "20",
             "popsize": 50,
             "max_generations": 200,
             "seed": 42,
@@ -183,11 +186,11 @@
             }
         },
         {
-            "id": "AMDE/current-to-best/1",
+            "id": "21",
             "popsize": 50,
             "max_generations": 200,
             "seed": 42,
-            "strategy": "best/2",
+            "strategy": "current-to-rand/1",
             "F1": 0.5,
             "F2": 0.5,
             "CR": 0.5,
@@ -196,11 +199,11 @@
             }
         },
         {
-            "id": "AMDE/current-to-rand/1",
+            "id": "22",
             "popsize": 50,
             "max_generations": 200,
             "seed": 42,
-            "strategy": "best/2",
+            "strategy": "current-to-best/1",
             "F1": 0.5,
             "F2": 0.5,
             "CR": 0.5,
@@ -209,15 +212,556 @@
             }
         }
     ],
-    "cases_NBPSO": [
+    "cases_BDE_AMDE_Table5_Table8_PopulationGenerationSweep": [
         {
-            "id": "nbpso_1",
+            "id": "7",
+            "popsize": 200,
+            "max_generations": 50,
+            "seed": 42,
+            "strategy": "best/1",
+            "F1": 0.5,
+            "F2": 0.5,
+            "CR": 0.5,
+            "decoder": {
+                "name": "sigma",
+                "bounds": [-6.0, 6.0]
+            }
+        },        
+        {
+            "id": "8",
+            "popsize": 100,
+            "max_generations": 100,
+            "seed": 42,
+            "strategy": "best/1",
+            "F1": 0.5,
+            "F2": 0.5,
+            "CR": 0.5,
+            "decoder": {
+                "name": "sigma",
+                "bounds": [-6.0, 6.0]
+            }
+        },
+        {
+            "id": "9",
+            "popsize": 20,
+            "max_generations": 500,
+            "seed": 42,
+            "strategy": "best/1",
+            "F1": 0.5,
+            "F2": 0.5,
+            "CR": 0.5,
+            "decoder": {
+                "name": "sigma",
+                "bounds": [-6.0, 6.0]
+            }
+        },
+        {
+            "id": "999",
+            "popsize": 200,
+            "max_generations": 50,
+            "seed": 42,
+            "strategy": "best/1",
+            "F1": 0.5,
+            "F2": 0.5,
+            "CR": 0.5,
+            "decoder": {
+                "name": "am"
+            }
+        },
+        {
+            "id": "28",
+            "popsize": 100,
+            "max_generations": 100,
+            "seed": 42,
+            "strategy": "best/1",
+            "F1": 0.5,
+            "F2": 0.5,
+            "CR": 0.5,
+            "decoder": {
+                "name": "am"
+            }
+        },
+        {
+            "id": "29",
+            "popsize": 20,
+            "max_generations": 500,
+            "seed": 42,
+            "strategy": "best/1",
+            "F1": 0.5,
+            "F2": 0.5,
+            "CR": 0.5,
+            "decoder": {
+                "name": "am"
+            }
+        },
+    
+        {
+            "id": "30",
+            "popsize": 10,
+            "max_generations": 1000,
+            "seed": 42,
+            "strategy": "best/1",
+            "F1": 0.5,
+            "F2": 0.5,
+            "CR": 0.5,
+            "decoder": {
+                "name": "am"
+            }
+        }
+    ],
+    "cases_BDE_Table6_F_CR_Sweep": [
+        {
+            "id": "10",
+            "popsize": 50,
+            "max_generations": 200,
+            "seed": 42,
+            "strategy": "best/1",
+            "F1": 0.3,
+            "F2": 0.7,
+            "CR": 0.1,
+            "decoder": {
+                "name": "sigma",
+                "bounds": [-6.0, 6.0]
+            }
+        },        
+        {
+            "id": "11",
+            "popsize": 50,
+            "max_generations": 200,
+            "seed": 42,
+            "strategy": "best/1",
+            "F1": 0.3,
+            "F2": 0.7,
+            "CR": 0.5,
+            "decoder": {
+                "name": "sigma",
+                "bounds": [-6.0, 6.0]
+            }
+        },
+        {
+            "id": "12",
+            "popsize": 50,
+            "max_generations": 200,
+            "seed": 42,
+            "strategy": "best/1",
+            "F1": 0.3,
+            "F2": 0.7,
+            "CR": 0.7,
+            "decoder": {
+                "name": "sigma",
+                "bounds": [-6.0, 6.0]
+            }
+        },
+        {
+            "id": "13",
+            "popsize": 50,
+            "max_generations": 200,
+            "seed": 42,
+            "strategy": "best/1",
+            "F1": 0.3,
+            "F2": 0.7,
+            "CR": 0.9,
+            "decoder": {
+                "name": "sigma",
+                "bounds": [-6.0, 6.0]
+            }
+        },
+        {
+            "id": "14",
+            "popsize": 50,
+            "max_generations": 200,
+            "seed": 42,
+            "strategy": "best/1",
+            "F1": 0.5,
+            "F2": 0.5,
+            "CR": 0.1,
+            "decoder": {
+                "name": "sigma",
+                "bounds": [-6.0, 6.0]
+            }
+        },
+        {
+            "id": "15",
+            "popsize": 50,
+            "max_generations": 200,
+            "seed": 42,
+            "strategy": "best/1",
+            "F1": 0.5,
+            "F2": 0.5,
+            "CR": 0.5,
+            "decoder": {
+                "name": "sigma",
+                "bounds": [-6.0, 6.0]
+            }
+        },
+        {
+            "id": "16",
+            "popsize": 50,
+            "max_generations": 200,
+            "seed": 42,
+            "strategy": "best/1",
+            "F1": 0.5,
+            "F2": 0.5,
+            "CR": 0.7,
+            "decoder": {
+                "name": "sigma",
+                "bounds": [-6.0, 6.0]
+            }
+        },
+        {
+            "id": "17",
+            "popsize": 50,
+            "max_generations": 200,
+            "seed": 42,
+            "strategy": "best/1",
+            "F1": 0.5,
+            "F2": 0.5,
+            "CR": 0.9,
+            "decoder": {
+                "name": "sigma",
+                "bounds": [-6.0, 6.0]
+            }
+        },
+        {
+            "id": "18",
+            "popsize": 50,
+            "max_generations": 200,
+            "seed": 42,
+            "strategy": "best/1",
+            "F1": 0.9,
+            "F2": 0.1,
+            "CR": 0.1,
+            "decoder": {
+                "name": "sigma",
+                "bounds": [-6.0, 6.0]
+            }
+        },
+        {
+            "id": "19",
+            "popsize": 50,
+            "max_generations": 200,
+            "seed": 42,
+            "strategy": "best/1",
+            "F1": 0.9,
+            "F2": 0.1,
+            "CR": 0.5,
+            "decoder": {
+                "name": "sigma",
+                "bounds": [-6.0, 6.0]
+            }
+        },
+        {
+            "id": "20",
+            "popsize": 50,
+            "max_generations": 200,
+            "seed": 42,
+            "strategy": "best/1",
+            "F1": 0.9,
+            "F2": 0.1,
+            "CR": 0.7,
+            "decoder": {
+                "name": "sigma",
+                "bounds": [-6.0, 6.0]
+            }
+        },
+        {
+            "id": "21",
+            "popsize": 50,
+            "max_generations": 200,
+            "seed": 42,
+            "strategy": "best/1",
+            "F1": 0.9,
+            "F2": 0.1,
+            "CR": 0.9,
+            "decoder": {
+                "name": "sigma",
+                "bounds": [-6.0, 6.0]
+            }
+        }
+    ],
+    "cases_AMDE_Table9_F_CR_Sweep": [
+        {
+            "id": "31",
+            "popsize": 50,
+            "max_generations": 200,
+            "seed": 42,
+            "strategy": "best/1",
+            "F1": 0.3,
+            "F2": 0.7,
+            "CR": 0.1,
+            "decoder": {
+                "name": "am"
+            }
+        },        
+        {
+            "id": "32",
+            "popsize": 50,
+            "max_generations": 200,
+            "seed": 42,
+            "strategy": "best/1",
+            "F1": 0.3,
+            "F2": 0.7,
+            "CR": 0.5,
+            "decoder": {
+                "name": "am"
+            }
+        },
+        {
+            "id": "33",
+            "popsize": 50,
+            "max_generations": 200,
+            "seed": 42,
+            "strategy": "best/1",
+            "F1": 0.3,
+            "F2": 0.7,
+            "CR": 0.7,
+            "decoder": {
+                "name": "am"
+            }
+        },
+        {
+            "id": "34",
+            "popsize": 50,
+            "max_generations": 200,
+            "seed": 42,
+            "strategy": "best/1",
+            "F1": 0.3,
+            "F2": 0.7,
+            "CR": 0.9,
+            "decoder": {
+                "name": "am"
+            }
+        },
+        {
+            "id": "35",
+            "popsize": 50,
+            "max_generations": 200,
+            "seed": 42,
+            "strategy": "best/1",
+            "F1": 0.5,
+            "F2": 0.5,
+            "CR": 0.1,
+            "decoder": {
+                "name": "am"
+            }
+        },
+        {
+            "id": "36",
+            "popsize": 50,
+            "max_generations": 200,
+            "seed": 42,
+            "strategy": "best/1",
+            "F1": 0.5,
+            "F2": 0.5,
+            "CR": 0.5,
+            "decoder": {
+                "name": "am"
+            }
+        },
+        {
+            "id": "37",
+            "popsize": 50,
+            "max_generations": 200,
+            "seed": 42,
+            "strategy": "best/1",
+            "F1": 0.5,
+            "F2": 0.7,
+            "CR": 0.5,
+            "decoder": {
+                "name": "am"
+            }
+        },
+        {
+            "id": "38",
+            "popsize": 50,
+            "max_generations": 200,
+            "seed": 42,
+            "strategy": "best/1",
+            "F1": 0.5,
+            "F2": 0.5,
+            "CR": 0.9,
+            "decoder": {
+                "name": "am"
+            }
+        },
+        {
+            "id": "39",
+            "popsize": 50,
+            "max_generations": 200,
+            "seed": 42,
+            "strategy": "best/1",
+            "F1": 0.9,
+            "F2": 0.1,
+            "CR": 0.1,
+            "decoder": {
+                "name": "am"
+            }
+        },
+        {
+            "id": "40",
+            "popsize": 50,
+            "max_generations": 200,
+            "seed": 42,
+            "strategy": "best/1",
+            "F1": 0.9,
+            "F2": 0.1,
+            "CR": 0.5,
+            "decoder": {
+                "name": "am"
+            }
+        },
+        {
+            "id": "41",
+            "popsize": 50,
+            "max_generations": 200,
+            "seed": 42,
+            "strategy": "best/1",
+            "F1": 0.9,
+            "F2": 0.1,
+            "CR": 0.7,
+            "decoder": {
+                "name": "am"
+            }
+        },
+        {
+            "id": "42",
+            "popsize": 50,
+            "max_generations": 200,
+            "seed": 42,
+            "strategy": "best/1",
+            "F1": 0.9,
+            "F2": 0.1,
+            "CR": 0.9,
+            "decoder": {
+                "name": "am"
+            }
+        }
+    ],
+    "cases_NBPSO_Table11_Swarm_Generations": [
+        {
+            "id": "55",
+            "swarm_size": 100,
+            "max_generations": 100,
+            "seed": 42,
+            "w": 0.729,
+            "c1": 1.49445,
+            "c2": 1.49445,
+            "vmax": 4.0
+        },
+        {
+            "id": "56",
             "swarm_size": 50,
             "max_generations": 200,
             "seed": 42,
-            "w": 0.7,
-            "c1": 1.5,
-            "c2": 1.5
+            "w": 0.729,
+            "c1": 1.49445,
+            "c2": 1.49445,
+            "vmax": 4.0
+        },
+        {
+            "id": "57",
+            "swarm_size": 20,
+            "max_generations": 500,
+            "seed": 42,
+            "w": 0.729,
+            "c1": 1.49445,
+            "c2": 1.49445,
+            "vmax": 4.0
+        }
+    ],
+    "cases_NBPSO_Table12_Acceleration": [
+        {
+            "id": "58",
+            "swarm_size": 100,
+            "max_generations": 100,
+            "seed": 42,
+            "w": 0.729,
+            "c1": 1.9,
+            "c2": 1,
+            "vmax": 4.0
+        },
+        {
+            "id": "59",
+            "swarm_size": 100,
+            "max_generations": 100,
+            "seed": 42,
+            "w": 0.729,
+            "c1": 1,
+            "c2": 1.9,
+            "vmax": 4.0
+        },
+        {
+            "id": "60",
+            "swarm_size": 100,
+            "max_generations": 100,
+            "seed": 42,
+            "w": 0.729,
+            "c1": 1,
+            "c2": 1,
+            "vmax": 4.0
+        }
+    ],
+    "cases_NBPSO_Table13_Inertia": [
+        {
+            "id": "61",
+            "swarm_size": 100,
+            "max_generations": 100,
+            "seed": 42,
+            "w": 0.9,
+            "c1": 1,
+            "c2": 1,
+            "vmax": 4.0
+        },
+        {
+            "id": "62",
+            "swarm_size": 100,
+            "max_generations": 100,
+            "seed": 42,
+            "w": 0.4,
+            "c1": 1,
+            "c2": 1,
+            "vmax": 4.0
+        }
+    ],
+    "cases_NBPSO_Table14_LDIW": [
+        {
+            "id": "63",
+            "swarm_size": 100,
+            "max_generations": 100,
+            "seed": 42,
+            "w": {
+                "w_max": 0.9,
+                "w_min": 0.5
+            },
+            "c1": 1,
+            "c2": 1,
+            "vmax": 4.0
+        },
+        {
+            "id": "64",
+            "swarm_size": 100,
+            "max_generations": 100,
+            "seed": 42,
+            "w": {
+                "w_max": 0.9,
+                "w_min": 0.4
+            },
+            "c1": 1,
+            "c2": 1,
+            "vmax": 4.0
+        },
+        {
+            "id": "65",
+            "swarm_size": 100,
+            "max_generations": 100,
+            "seed": 42,
+            "w": {
+                "w_max": 0.9,
+                "w_min": 0.2
+            },
+            "c1": 1,
+            "c2": 1,
+            "vmax": 4.0
         }
     ]
 }

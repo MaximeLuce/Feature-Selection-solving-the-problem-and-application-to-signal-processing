@@ -18,18 +18,22 @@ class DataLoader:
     """
 
     @staticmethod
-    def load_data(dataset_id, test_size=0.2, random_state=42):
+    def load_data(dataset_id, test_size=0.2, random_state=42, verbose=False):
         """
         Load dataset and split into train/test.
         If id=0, we use the local kaggle data set.
         """
         cache_key = (dataset_id, test_size, random_state)
         if cache_key in DataLoader._cache:
+            if verbose:
+                print(f"Dataset cache hit: ID={dataset_id}")
             return DataLoader._cache[cache_key]
 
-        print(f"Dataset ID={dataset_id} loading...")
+        if verbose:
+            print(f"Dataset loading: ID={dataset_id}")
         if dataset_id == 0:
-            print("Loading local kaggle dataset...")
+            if verbose:
+                print("Dataset loading: local kaggle dataset")
             file_path = "app/Data/sonar_dataset.csv"
             
             try:
@@ -39,8 +43,8 @@ class DataLoader:
 
             # removing Debris to transform the dataset into binar dataset
             df = df[df.iloc[:, -1] != 'Debris']
-			# extract the features X and the cible y
-            X = df.iloc[:, :-1] # all lines, all columns except the last one
+            # extract only freq_ features
+            X = df.filter(like="freq_")
             y = df.iloc[:, -1] # all lines, just the last column
             
             # metadata using the UCI format
@@ -68,6 +72,8 @@ class DataLoader:
 
         loaded_data = (X_train, X_test, y_train, y_test, metadata)
         DataLoader._cache[cache_key] = loaded_data
+        if verbose:
+            print(f"Dataset loaded: ID={dataset_id}")
         return loaded_data
     
 # TEST

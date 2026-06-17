@@ -7,7 +7,7 @@ from app.OptimizationAlgorithm.RandomSearch import RandomSearch
 from app.OptimizationAlgorithm.Greedy import Greedy
 
 # ML models
-from app.MLModels.HeavyModelSVM import HeavyModelSVM
+#from app.MLModels.HeavyModelSVM import HeavyModelSVM
 
 import statistics
 #import time
@@ -77,7 +77,7 @@ class SAParameters:
                     problem = Problem.load_dataset(dataset_id)
                     print(f"Problem loaded: ID={dataset_id} with {problem.num_features} features and {problem.num_instances} instances.")
 
-                    heavy_model = HeavyModelSVM(dataset_id)
+                    #heavy_model = HeavyModelSVM(dataset_id)
                 except Exception as e:
                     print(f"Error loading data: {e}")
                     continue
@@ -129,8 +129,8 @@ class SAParameters:
                     sa_b, sa_w, sa_a, sa_s = self._calc_stats(sa_results_knn)
                     sa_b_evals, sa_w_evals, sa_a_evals, sa_s_evals = self._calc_stats(sa_evals)
 
-                    score_champion_heavy = heavy_model.evaluate(best_overall_mask) * 100
-                    nb_features_keep = sum(best_overall_mask)
+                    #score_champion_heavy = heavy_model.evaluate(best_overall_mask) * 100
+                    #nb_features_keep = sum(best_overall_mask)
 
                     #print("End of computation for SimulatedAnnealing")
 
@@ -140,7 +140,7 @@ class SAParameters:
                     
                     print("-" * 135)
                     print(f"{'Dataset_ID':<15} | {'SA (Light Model) [10x]':<26} | {'Champion SVM'}")
-                    print(f"{dataset_id:<15} |  {'best*   worst  avg    std':<26} | {score_champion_heavy:.2f}% ({nb_features_keep} features)")
+                    #print(f"{dataset_id:<15} |  {'best*   worst  avg    std':<26} | {score_champion_heavy:.2f}% ({nb_features_keep} features)")
                     print("-" * 135)
 
                     sa_str = f"{sa_b:>5.0f} {sa_w:>6.0f} {sa_a:>6.1f} {sa_s:>5.1f}"
@@ -154,7 +154,7 @@ class SAParameters:
                     row = [
                         case['id'], dataset_id, initial_temp, cooling_rate,
                         round(sa_b, 1), round(sa_w, 1), round(sa_a, 2), round(sa_s, 2), round(t_sa, 3), round(sa_a_evals, 1),
-                        round(score_champion_heavy, 2), nb_features_keep
+                        #round(score_champion_heavy, 2), nb_features_keep
                     ]
                     writer.writerow(row)
                     

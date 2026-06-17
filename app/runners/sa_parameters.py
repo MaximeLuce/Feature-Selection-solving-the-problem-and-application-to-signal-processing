@@ -1,165 +1,195 @@
-# configs
-from app.Utilities.ConfigLoader import load_config
-
-from app.Problem.Problem import Problem
-
-# OM algos
-from app.OptimizationAlgorithm.EvolutionaryAlgorithm import EvolutionaryAlgorithm
-from app.OptimizationAlgorithm.SimulatedAnnealing import SimulatedAnnealing
-from app.OptimizationAlgorithm.RandomSearch import RandomSearch
-from app.OptimizationAlgorithm.Greedy import Greedy
-
-# ML models
-from app.MLModels.HeavyModelSVM import HeavyModelSVM
-
-import statistics
-#import time
-import timeit
 import os
-import csv
+
+for env_var in (
+    "OMP_NUM_THREADS",
+    "OPENBLAS_NUM_THREADS",
+    "MKL_NUM_THREADS",
+    "VECLIB_MAXIMUM_THREADS",
+    "NUMEXPR_NUM_THREADS",
+):
+    os.environ.setdefault(env_var, "1")
+
+import numpy as np
+
+from app.monitoring import MonitoringMetric
+from app.OptimizationAlgorithm.SimulatedAnnealing import SimulatedAnnealing
+from app.Problem.Problem import Problem
+from app.Utilities.ConfigLoader import load_config
+from app.runners.common import (
+    build_rebuilt_csv_path,
+    build_run_configs,
+    rebuild_grouped_csv_from_raw,
+    run_configs,
+    save_raw_run_result,
+)
+
+SA_CSV_SCHEMA = [
+    {"column": "Case_ID", "key": "case_id"},
+    {"column": "Dataset_ID", "key": "dataset_id"},
+    {"column": "Initial_Temp", "key": "initial_temp"},
+    {"column": "Cooling_Rate", "key": "cooling_rate"},
+    {"column": "Total_Evals", "key": "total_evals"},
+    {"column": "Expected_Final_Temp", "key": "expected_final_temperature", "digits": 8},
+    {"column": "Final_Temp", "key": "final_temperature", "digits": 8},
+    {"column": "Evaluator", "key": "evaluation_model"},
+    {"column": "Fitness", "key": "fitness_name"},
+    {"column": "Alpha", "key": "alpha"},
+    {"column": "CV_Folds", "key": "cv_folds"},
+    {"column": "SA_Best", "key": "score_best", "digits": 1},
+    {"column": "SA_Worst", "key": "score_worst", "digits": 1},
+    {"column": "SA_Avg", "key": "score_avg", "digits": 2},
+    {"column": "SA_Std", "key": "score_std", "digits": 2},
+    {"column": "SA_Wall_Time_Avg(s)", "key": "wall_avg_s", "digits": 3},
+    {"column": "SA_CPU_Time_Avg(s)", "key": "cpu_avg_s", "digits": 3},
+    {"column": "SA_NFE_Avg", "key": "nfe_avg", "digits": 1},
+    {"column": "Champion_Score", "key": "champion_score", "digits": 2},
+    {"column": "Champion_Features", "key": "champion_features"},
+    {"column": "Nb_Features_Keep", "key": "nb_features_keep", "digits": 2},
+]
+
+SA_GROUP_FIELDS = [
+    "case_id", "dataset_id", "initial_temp", "cooling_rate", "total_evals",
+    "expected_final_temperature", "final_temperature",
+    "evaluation_model", "fitness_name", "alpha", "cv_folds",
+]
+SA_MONITORING_METRICS = [
+    MonitoringMetric.ELAPSED_TIME_NS.value,
+    MonitoringMetric.CPU_TIME_NS.value,
+    MonitoringMetric.EVALUATION_COUNT.value,
+    MonitoringMetric.BEST_FITNESS.value,
+    MonitoringMetric.BEST_MASK.value,
+    MonitoringMetric.CURRENT_MASK.value,
+    MonitoringMetric.CURRENT_FITNESS.value,
+    MonitoringMetric.TEMPERATURE.value,
+    MonitoringMetric.ACCEPTANCE_RATE.value,
+    MonitoringMetric.FINAL_TEMPERATURE.value,
+]
+RAW_DIR = "app/Results/raw"
+RAW_FILENAME = "SA_raw_cases_SA_Table10.jsonl"
+
+
+def run_sa_config(config):
+    dataset_id = config["dataset_id"]
+    evaluation_config = dict(config["evaluation_config"])
+    evaluation_config["seed"] = config["seed"]
+    problem = Problem.load_dataset(dataset_id, evaluation_config)
+
+    monitoring = dict(config.get("monitoring", {}))
+    monitoring_metrics = list(monitoring.get("metrics", []))
+    for metric in SA_MONITORING_METRICS:
+        if metric not in monitoring_metrics:
+            monitoring_metrics.append(metric)
+    monitoring["metrics"] = monitoring_metrics
+
+    sa = SimulatedAnnealing(
+        problem,
+        max_evaluations=config["total_evals"],
+        initial_temp=config["initial_temp"],
+        cooling_rate=config["cooling_rate"],
+        seed=config["seed"],
+        monitoring=monitoring,
+    )
+    result = sa.run()
+
+    best_mask = np.array(result.best_mask, dtype=int)
+    final_score = float(problem.evaluate_final(best_mask) * 100)
+
+    # Append raw result to shared JSONL file
+    raw_data = {
+        "config": {
+            "case_id": config["case_id"],
+            "dataset_id": dataset_id,
+            "initial_temp": config["initial_temp"],
+            "cooling_rate": config["cooling_rate"],
+            "total_evals": config["total_evals"],
+            "expected_final_temperature": result.expected_final_temperature,
+            "final_temperature": result.final_temperature,
+            "base_seed": config["base_seed"],
+            "evaluation_model": evaluation_config["evaluation_model"],
+            "fitness_name": evaluation_config["fitness"],
+            "alpha": evaluation_config["alpha"],
+            "cv_folds": evaluation_config["cv_folds"],
+        },
+        "summary": {
+            "best_fitness": float(result.best_fitness),
+            "final_score": final_score,
+            "nb_features_keep": int(best_mask.sum()),
+            "elapsed_wall_s": float(result.wall_ns / 1_000_000_000),
+            "elapsed_cpu_s": float(result.cpu_ns / 1_000_000_000),
+            "evaluations_count": result.evaluations,
+        },
+        "history": result.history,
+    }
+    save_raw_run_result(RAW_DIR, raw_data, RAW_FILENAME)
+
+    return {
+        "run_id": config["run_id"],
+        "case_id": config["case_id"],
+        "dataset_id": dataset_id,
+        "initial_temp": config["initial_temp"],
+        "cooling_rate": config["cooling_rate"],
+        "total_evals": config["total_evals"],
+        "expected_final_temperature": float(result.expected_final_temperature),
+        "final_temperature": float(result.final_temperature),
+        "base_seed": config["base_seed"],
+        "evaluation_model": evaluation_config["evaluation_model"],
+        "fitness_name": evaluation_config["fitness"],
+        "alpha": evaluation_config["alpha"],
+        "cv_folds": evaluation_config["cv_folds"],
+        "best_fitness": float(result.best_fitness),
+        "final_score": final_score,
+        "nb_features_keep": int(best_mask.sum()),
+        "elapsed_wall_s": float(result.wall_ns / 1_000_000_000),
+        "elapsed_cpu_s": float(result.cpu_ns / 1_000_000_000),
+        "evaluations_count": result.evaluations,
+    }
+
 
 class SAParameters:
     def __init__(self):
-        # loading the config
         config = load_config()
-        
-        # main parameters
         self.dataset_ids = config.get("dataset_ids", [0])
         self.runs_per_algo = config.get("runs_per_algo", 10)
-        self.total_evals = config.get("total_evals", 10)
-        #loading specific case for SA: 'cases_SA_initial_temp' or 'cases_SA_cooling_rate'
-        self.cases = config.get("cases_SA_initial_temp", [])
-        
-        if not self.cases:
-            print("No cases config has been loaded.")
-
-        self.cases = config.get("cases_SA_initial_temp")
-
-    def _calc_stats(self, results):
-        """Auxiliary function to computer best, worst, avg, std"""
-        best = max(results)
-        worst = min(results)
-        avg = statistics.mean(results)
-        std = statistics.stdev(results) if len(results) > 1 else 0.0
-        return best, worst, avg, std
+        self.total_evals = config.get("total_evals", 10000)
+        self.cases = config.get("cases_SA_Table10", [])
+        self.evaluation_cases = config.get("evaluation_cases", [{
+            "evaluation_model": "svm",
+            "fitness": "weighted_error",
+            "alpha": 0.5,
+            "cv_folds": 5,
+        }])
+        self.csv_filepath = config.get(
+            "csv_filepath",
+            "app/Results/SAParameters/SAParameters_cases_SA_Table10.csv",
+        )
 
     def run_all(self):
-        # main parameters
-        runs_per_algo = self.runs_per_algo
-        
-        csv_filepath = "app/Results/SAParameters/SAParameters_Best_Initial_Temperature.csv"
-    
-        #csv_filepath = "app/Results/SAParameters/SAParameters_Best_Cooling_Rate.csv"
-        
-        print(f"Start running... Results will be saved to {csv_filepath}")
-    
+        configurations = list(build_run_configs(
+            self.dataset_ids,
+            self.cases,
+            self.evaluation_cases,
+            self.runs_per_algo,
+        ))
+        for c in configurations:
+            c["total_evals"] = self.total_evals
 
-        file_exists = os.path.isfile(csv_filepath)
-        with open(csv_filepath, mode='a', newline='') as file:
-            writer = csv.writer(file, delimiter=';')
-            
-            if not file_exists:
-                header = [
-                    "Case_ID", "Dataset_ID", "Initial_temp", "Cooling_rate",
-                    "SA_Best_light", "SA_Worst_light", "SA_Avg_light", "SA_Std_light",
-                    "SA_Best_heavy", "SA_Worst_heavy", "SA_Avg_heavy", "SA_Std_heavy",
-                    "SA_Time(s)", "SA_NFE_Avg"
-                ]
-                writer.writerow(header)
+        run_configs(
+            configurations, run_sa_config, self.csv_filepath, SA_CSV_SCHEMA,
+            group_fields=SA_GROUP_FIELDS,
+            max_workers=14
+        )
 
-            for idx, dataset_id in enumerate(self.dataset_ids):
-                try:
-                    problem = Problem.load_dataset(dataset_id)
-                    print(f"Problem loaded: ID={dataset_id} with {problem.num_features} features and {problem.num_instances} instances.")
-
-                    heavy_model = HeavyModelSVM(dataset_id)
-                except Exception as e:
-                    print(f"Error loading data: {e}")
-                    continue
-
-                
-                # diplay result for the dataset_id
-
-                print(f"\n{'='*50}")
-                print(f"=== ANALYZING DATASET ID {dataset_id} ===")
-                print(f"{'='*50}")
-                
-                for case in self.cases:
-                    initial_temp = case["initial_temp"]
-                    cooling_rate = case["cooling_rate"]
-
-                    total_evals = self.total_evals
-
-                    print(f"\n--- RUNNING CASE {case['id']} ---")
-                    print(f"Params: initial_temp={initial_temp}, cooling_rate={cooling_rate}, Total Evals={total_evals}")
-                    
-
-                    # Simulated Annealing [10x]
-                    sa_results_light = []
-                    sa_results_heavy = []
-                    sa_evals = []
-
-                    # tracking the best overall
-                    best_overall_fitness = float('inf')
-                    best_overall_mask = None
-
-                    t0_sa = timeit.default_timer()
-                    for _ in range(runs_per_algo):
-                        problem.reset_counter() # set to 0 the NFE counter
-                        sa = SimulatedAnnealing(problem, total_evals, initial_temp, cooling_rate)
-                        best_ind = sa.run()
-                        sa_evals.append(problem.evaluations_count)
-
-                        score_light = (1.0 - best_ind.fitness) * 100
-                        sa_results_light.append(score_light)
-
-                        #sa_results.append(float(best_ind.fitness))
-                        #sa_results.append((1.0 - best_ind.fitness) * 100)
-
-                        score_heavy = heavy_model.evaluate(best_ind.features_mask) * 100
-                        sa_results_heavy.append(score_heavy)
-
-                        if best_ind.fitness < best_overall_fitness:
-                            best_overall_fitness = best_ind.fitness
-                            # .copy() to not erase the reference
-                            best_overall_mask = best_ind.features_mask.copy()
-                            
-                    t_sa = timeit.default_timer() - t0_sa
-                    sa_b, sa_w, sa_a, sa_s = self._calc_stats(sa_results_light)
-                    sa_b_heavy, sa_w_heavy, sa_a_heavy, sa_s_heavy = self._calc_stats(sa_results_heavy)
-                    sa_b_evals, sa_w_evals, sa_a_evals, sa_s_evals = self._calc_stats(sa_evals)
-
-                    score_champion_heavy = heavy_model.evaluate(best_overall_mask) * 100
-                    nb_features_keep = sum(best_overall_mask)
-                    #print("End of computation for SimulatedAnnealing")
+    def rebuild_summary_from_raw(self, output_csv_filepath=None):
+        raw_filepath = os.path.join(RAW_DIR, RAW_FILENAME)
+        rebuilt_csv_filepath = output_csv_filepath or build_rebuilt_csv_path(self.csv_filepath)
+        return rebuild_grouped_csv_from_raw(
+            raw_filepath=raw_filepath,
+            csv_filepath=self.csv_filepath,
+            csv_schema=SA_CSV_SCHEMA,
+            group_fields=SA_GROUP_FIELDS,
+            output_csv_filepath=rebuilt_csv_filepath,
+        )
 
 
-                    # display head of table
-                    
-                    
-                    print("-" * 135)
-                    print(f"{'Dataset_ID':<15} | {'SA (Light Model) [10x]':<27} | {'SA (Heavy Model) [10x]':<26} | {'Champion SVM'}")
-                    print(f"{dataset_id:<15} |  {'best*   worst  avg    std':<26} | {'best*   worst  avg    std':<26} | {score_champion_heavy:.2f}% ({nb_features_keep} features)")
-                    print("-" * 135)
-
-                    sa_str = f"{sa_b:>5.0f} {sa_w:>6.0f} {sa_a:>6.1f} {sa_s:>5.1f}"
-                    sa_str_heavy = f"{sa_b_heavy:>5.0f} {sa_w_heavy:>6.0f} {sa_a_heavy:>6.1f} {sa_s_heavy:>5.1f}"
-                    sa_evals_str = f"{sa_b_evals:>5.0f} {sa_w_evals:>6.0f} {sa_a_evals:>6.1f} {sa_s_evals:>5.1f}"
-
-                    print(f"{'Score':<15} | {sa_str:<26} | {sa_str_heavy:<26}")
-                    print(f"{'Time':<15} |  {t_sa:<5.1f}s |")
-                    print(f"{'NFE':<15} | {sa_evals_str:<26} |")
-                    print("-" * 135)
-
-                    row = [
-                        case['id'], dataset_id, initial_temp, cooling_rate,
-                        round(sa_b, 1), round(sa_w, 1), round(sa_a, 2), round(sa_s, 2),
-                        round(sa_b_heavy, 1), round(sa_w_heavy, 1), round(sa_a_heavy, 2), round(sa_s_heavy, 2),
-                        round(t_sa, 3), round(sa_a_evals, 1),
-                        round(score_champion_heavy, 2), nb_features_keep
-                    ]
-                    writer.writerow(row)
-                    
-                    # force saving
-                    file.flush()
-                    print(f"Case {case['id']} saved!")
+if __name__ == "__main__":
+    SAParameters().run_all()

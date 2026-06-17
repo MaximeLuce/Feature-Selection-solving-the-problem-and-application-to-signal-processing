@@ -1,7 +1,9 @@
-# problem.py
+# app/Problem/Problem.py
+
+import numpy as np
 
 from app.Problem.DataLoader import DataLoader
-from app.Problem.Evaluator import Evaluator, KNNEvaluator, SVMEvaluator
+from app.Problem.Evaluator import Evaluator, KNNEvaluator, RFEvaluator, SVMEvaluator
 from app.Problem.Fitness import ErrorFitness, Fitness, WeightedErrorFitness
 from app.Utilities.ConfigLoader import load_config
 
@@ -35,7 +37,7 @@ class Problem:
 
     def __str__(self):
         return (
-            f"Problem loaded: dataset with {self.num_features} "
+            f"Problem: dataset with {self.num_features} "
             f"features and {self.num_instances} instances."
             f" Evaluator: {self.evaluation_model}, "
             f"Fitness: {self.fitness_name}"
@@ -47,9 +49,11 @@ class Problem:
     @staticmethod
     def _build_evaluator(evaluation_model, cv_folds):
         if evaluation_model == "svm":
-            return SVMEvaluator(cv_folds=cv_folds)
+            return SVMEvaluator(cv_folds=cv_folds, scoring="accuracy")
         if evaluation_model == "knn":
-            return KNNEvaluator(cv_folds=cv_folds)
+            return KNNEvaluator(cv_folds=cv_folds, scoring="accuracy")
+        if evaluation_model == "rf":
+            return RFEvaluator(cv_folds=cv_folds)
         raise ValueError(f"Unknown evaluation model: {evaluation_model}")
 
     @staticmethod
@@ -107,18 +111,33 @@ class Problem:
         Compute the fitness function for a subset of features.
         feature_mask: binar list (ex: [1, 0, 1, 0...]) of size num_features
         """
-        self.evaluations_count += 1
+        return float(self.evaluate_batch([feature_mask])[0])
 
-        selected_indices = [i for i, bit in enumerate(feature_mask) if bit == 1]
+    def evaluate_batch(self, feature_masks):
+        masks = np.asarray(feature_masks, dtype=int)
+        if masks.ndim == 1:
+            masks = masks.reshape(1, -1)
+        if masks.shape[1] != self.num_features:
+            raise ValueError(
+                f"Expected masks with {self.num_features} features, got {masks.shape[1]}."
+            )
 
-        if len(selected_indices) == 0:
-            return 1.0
+        self.evaluations_count += int(masks.shape[0])
+        results = np.ones(masks.shape[0], dtype=float)
+        feature_counts = masks.sum(axis=1)
 
-        X_subset = self.X.iloc[:, selected_indices]
-        accuracy = self.evaluator.evaluate(X_subset, self.y_values)
-        error = 1.0 - accuracy
-        feature_ratio = len(selected_indices) / self.num_features
-        return self.fitness.compute(error, feature_ratio)
+        for row_index, mask in enumerate(masks):
+            selected_indices = np.flatnonzero(mask)
+            if selected_indices.size == 0:
+                continue
+
+            X_subset = self.X.iloc[:, selected_indices]
+            accuracy = self.evaluator.evaluate(X_subset, self.y_values)
+            error = 1.0 - accuracy
+            feature_ratio = float(feature_counts[row_index]) / self.num_features
+            results[row_index] = self.fitness.compute(error, feature_ratio)
+
+        return results
 
     def evaluate_final(self, feature_mask):
         """Fit model on train data, score on test data (used after optimization)."""

@@ -91,3 +91,7 @@ tempCodeRunnerFile.py
 
 scalene-profile.json
 scalene-profile.html
+scalene-de-smoke.json
+uv.lock
+.vscode
+app/Results/raw/

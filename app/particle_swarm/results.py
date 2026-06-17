@@ -6,7 +6,7 @@ import numpy as np
 
 @dataclass
 class NBPSOResult:
-    best: np.ndarray
+    best_mask: np.ndarray
     best_fitness: float
     generations: int
     evaluations: int
