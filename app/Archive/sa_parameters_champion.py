@@ -1,10 +1,10 @@
 from app.Problem.Problem import Problem
 
 # OM algos
-from app.OptimizationAlgorithm.EvolutionaryAlgorithm import EvolutionaryAlgorithm
-from app.OptimizationAlgorithm.SimulatedAnnealing import SimulatedAnnealing
-from app.OptimizationAlgorithm.RandomSearch import RandomSearch
-from app.OptimizationAlgorithm.Greedy import Greedy
+from app.Archive.EvolutionaryAlgorithm import EvolutionaryAlgorithm
+from app.simulated_annealing.algorithm import SimulatedAnnealing
+from app.Archive.RandomSearch import RandomSearch
+from app.Archive.Greedy import Greedy
 
 # ML models
 #from app.MLModels.HeavyModelSVM import HeavyModelSVM

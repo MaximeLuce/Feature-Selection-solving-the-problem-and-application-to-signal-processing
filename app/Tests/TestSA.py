@@ -3,7 +3,7 @@ import sys
 import os
 
 from app.Problem.Problem import Problem
-from app.OptimizationAlgorithm.SimulatedAnnealing import SimulatedAnnealing
+from app.simulated_annealing.algorithm import SimulatedAnnealing
 
 def run_test():
     print("Starting test with SA...")

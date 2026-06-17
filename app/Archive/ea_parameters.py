@@ -1,5 +1,5 @@
 from app.Problem.Problem import Problem
-from app.OptimizationAlgorithm.EvolutionaryAlgorithm import EvolutionaryAlgorithm
+from app.Archive.EvolutionaryAlgorithm import EvolutionaryAlgorithm
 import statistics
 #import time
 import timeit

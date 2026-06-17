@@ -1,5 +1,5 @@
 import numpy as np
-from app.OptimizationAlgorithm.OptimizationAlgorithm import OptimizationAlgorithm
+from app.Archive.OptimizationAlgorithm import OptimizationAlgorithm
 from app.Problem.Individual import Individual
 
 class Greedy(OptimizationAlgorithm):

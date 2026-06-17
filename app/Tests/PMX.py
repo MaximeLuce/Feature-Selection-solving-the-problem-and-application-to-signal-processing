@@ -1,7 +1,7 @@
 import random
 from unittest.mock import patch
 from app.Problem.Individual import Individual
-from app.OptimizationAlgorithm.EvolutionaryAlgorithm import EvolutionaryAlgorithm
+from app.Archive.EvolutionaryAlgorithm import EvolutionaryAlgorithm
 
 # TEST
 

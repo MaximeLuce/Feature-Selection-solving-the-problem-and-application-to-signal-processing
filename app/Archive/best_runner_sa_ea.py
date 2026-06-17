@@ -1,7 +1,7 @@
-from app.OptimizationAlgorithm.EvolutionaryAlgorithm import EvolutionaryAlgorithm
-from app.OptimizationAlgorithm.Greedy import Greedy
-from app.OptimizationAlgorithm.RandomSearch import RandomSearch
-from app.OptimizationAlgorithm.SimulatedAnnealing import SimulatedAnnealing
+from app.Archive.EvolutionaryAlgorithm import EvolutionaryAlgorithm
+from app.Archive.Greedy import Greedy
+from app.Archive.RandomSearch import RandomSearch
+from app.simulated_annealing.algorithm import SimulatedAnnealing
 from app.Problem.Problem import Problem
 import statistics
 import time

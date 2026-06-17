@@ -1,22 +1,12 @@
+# app/runners/de_parameters.py
 import os
-
-for env_var in (
-    "OMP_NUM_THREADS",
-    "OPENBLAS_NUM_THREADS",
-    "MKL_NUM_THREADS",
-    "VECLIB_MAXIMUM_THREADS",
-    "NUMEXPR_NUM_THREADS",
-):
-    os.environ.setdefault(env_var, "1")
-
 import numpy as np
 
+from app.Archive.monitoring import MonitoringMetric
 from app.decoders import build_decoder
-from app.monitoring import MonitoringMetric
 from app.differential_evolution.algorithm import DifferentialEvolution
 from app.differential_evolution.featureselection import DecodedFeatureSelectionProblem
 from app.Problem import Problem
-from app.Utilities.ConfigLoader import load_config
 from app.runners.common import (
     build_rebuilt_csv_path,
     build_run_configs,
@@ -24,6 +14,7 @@ from app.runners.common import (
     run_configs,
     save_raw_run_result,
 )
+from app.utilities.config_loader import load_config
 
 DE_CSV_SCHEMA = [
     {"column": "Case_ID", "key": "case_id"},
@@ -50,8 +41,16 @@ DE_CSV_SCHEMA = [
 ]
 
 DE_GROUP_FIELDS = [
-    "case_id", "dataset_id", "strategy", "popsize", "max_generations",
-    "decoder_name", "evaluation_model", "fitness_name", "alpha", "cv_folds",
+    "case_id",
+    "dataset_id",
+    "strategy",
+    "popsize",
+    "max_generations",
+    "decoder_name",
+    "evaluation_model",
+    "fitness_name",
+    "alpha",
+    "cv_folds",
 ]
 
 TIMING_METRICS = [
@@ -66,7 +65,8 @@ RAW_MONITORING_METRICS = [
     MonitoringMetric.EVALUATION_COUNT.value,
 ]
 RAW_DIR = "app/Results/raw"
-RAW_FILENAME = "cases_BDE_Table6_F_CR_Sweep.jsonl"
+RAW_FILENAME = "cases_BDE_AMDE_Table5_Table8_PopulationGenerationSweep.jsonl"
+
 
 def run_de_config(config):
     print(
@@ -160,6 +160,7 @@ def run_de_config(config):
         "evaluations_count": result.evaluations,
     }
 
+
 class DEParameters:
     def __init__(self):
         self.config = load_config()
@@ -169,38 +170,52 @@ class DEParameters:
             "de_max_workers",
             max(1, min(14, os.cpu_count() or 14)),
         )
-        self.cases = self.config.get("cases_BDE_Table6_F_CR_Sweep", [])
-    
-        self.evaluation_cases = self.config.get("evaluation_cases", [{
-            "evaluation_model": "svm",
-            "fitness": "weighted_error",
-            "alpha": 0.5,
-            "cv_folds": 5,
-        }])
-        
-        self.csv_filepath = "app/Results/SAParameters/BDE_Table6_F_CR_Sweep.csv"
-        
-        #self.dataset_ids = [0]
-        #self.cases = [self.cases[0]]
-        #self.cases[0]["max_generations"] = 10
-        #self.runs_per_algo = 2 
-        #self.csv_filepath = "app/Results/SAParameters/test.csv"
-    
+        self.cases = self.config.get(
+            "cases_BDE_AMDE_Table5_Table8_PopulationGenerationSweep", []
+        )
 
-    
-        self.configurations = list(build_run_configs(self.dataset_ids, self.cases, self.evaluation_cases, self.runs_per_algo))
-        
+        self.evaluation_cases = self.config.get(
+            "evaluation_cases",
+            [
+                {
+                    "evaluation_model": "svm",
+                    "fitness": "weighted_error",
+                    "alpha": 0.5,
+                    "cv_folds": 5,
+                }
+            ],
+        )
+
+        self.csv_filepath = "app/Results/SAParameters/BDE_AMDE_Table5_Table8_PopulationGenerationSweep_RE_RUN.csv"
+
+        # .dataset_ids = [174]
+        # self.cases = [self.cases[6]]
+        # self.cases[0]["max_generations"] = 10
+        # self.runs_per_algo = 2
+        # self.csv_filepath = "app/Results/SAParameters/test.csv"
+
+        self.configurations = list(
+            build_run_configs(
+                self.dataset_ids, self.cases, self.evaluation_cases, self.runs_per_algo
+            )
+        )
+
     def run_all(self, parallel=True):
         run_configs(
-            self.configurations, run_de_config, self.csv_filepath, DE_CSV_SCHEMA,
+            self.configurations,
+            run_de_config,
+            self.csv_filepath,
+            DE_CSV_SCHEMA,
             group_fields=DE_GROUP_FIELDS,
             parallel=parallel,
             max_workers=self.max_workers,
-        )   
+        )
 
     def rebuild_summary_from_raw(self, output_csv_filepath=None):
         raw_filepath = os.path.join(RAW_DIR, RAW_FILENAME)
-        rebuilt_csv_filepath = output_csv_filepath or build_rebuilt_csv_path(self.csv_filepath)
+        rebuilt_csv_filepath = output_csv_filepath or build_rebuilt_csv_path(
+            self.csv_filepath
+        )
         return rebuild_grouped_csv_from_raw(
             raw_filepath=raw_filepath,
             csv_filepath=self.csv_filepath,

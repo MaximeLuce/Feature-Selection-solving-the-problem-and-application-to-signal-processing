@@ -1,26 +1,14 @@
 import copy
 import math
-from dataclasses import dataclass, field
-from typing import Any
 
 import numpy as np
 
-from app.monitoring import Monitor, MonitoringMetric
-from app.OptimizationAlgorithm.OptimizationAlgorithm import OptimizationAlgorithm
+from app.Archive.monitoring import Monitor
+from app.Archive.OptimizationAlgorithm import OptimizationAlgorithm
 from app.Problem.Individual import Individual
-from app.Utilities.masks import repair_zero_mask
+from app.utilities.masks import repair_zero_mask
 
-
-@dataclass
-class SAResult:
-    best_mask: list[int]
-    best_fitness: float
-    evaluations: int
-    expected_final_temperature: float
-    final_temperature: float
-    wall_ns: int | None = None
-    cpu_ns: int | None = None
-    history: list[dict[str, Any]] = field(default_factory=list)
+from app.simulated_annealing.results import SAResult
 
 
 class SimulatedAnnealing(OptimizationAlgorithm):

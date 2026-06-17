@@ -1,6 +1,6 @@
 import random
 from app.Problem.Individual import Individual
-from app.OptimizationAlgorithm.OptimizationAlgorithm import OptimizationAlgorithm
+from app.Archive.OptimizationAlgorithm import OptimizationAlgorithm
 
 class RandomSearch(OptimizationAlgorithm):
     def __init__(self, problem, max_evaluations=50000):

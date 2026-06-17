@@ -1,12 +1,12 @@
 import numpy as np
 
-from app.monitoring import Monitor
+from app.Archive.monitoring import Monitor
 from app.Utilities.masks import repair_zero_masks
 
 from .results import NBPSOResult
 
 
-class NewBinaryParticleSwarmOptimization:
+class NovelBinaryParticleSwarmOptimization:
     DEFAULT_CONFIG = {
         "swarm_size": 50,
         "w": 0.729,

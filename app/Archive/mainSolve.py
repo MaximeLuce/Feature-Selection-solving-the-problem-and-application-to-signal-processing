@@ -2,8 +2,8 @@ import numpy as np
 
 from app.Problem.DataLoader import * # class to load the .fsp file
 from app.Problem.Problem import * # class that contain a problem
-from app.OptimizationAlgorithm.EvolutionaryAlgorithm import *
-from app.OptimizationAlgorithm.RandomSearch import *
+from app.Archive.EvolutionaryAlgorithm import *
+from app.Archive.RandomSearch import *
 
 if __name__ == "__main__":
 

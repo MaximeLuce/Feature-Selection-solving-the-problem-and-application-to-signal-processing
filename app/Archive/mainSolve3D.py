@@ -3,8 +3,8 @@ import matplotlib.pyplot as plt
 
 from app.Problem.DataLoader import * 
 from app.Problem.Problem import * 
-from app.OptimizationAlgorithm.EvolutionaryAlgorithm import *
-from app.OptimizationAlgorithm.RandomSearch import *
+from app.Archive.EvolutionaryAlgorithm import *
+from app.Archive.RandomSearch import *
 
 if __name__ == "__main__":
 

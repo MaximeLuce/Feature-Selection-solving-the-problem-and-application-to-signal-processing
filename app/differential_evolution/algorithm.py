@@ -1,8 +1,8 @@
 # app/differential_evolution/algorithm.py
 
 import numpy as np
-from app.monitoring import Monitor
-from .results import DEResult, PopulationEvaluation
+from app.Archive.monitoring import Monitor
+from app.differential_evolution.results import DEResult, PopulationEvaluation
 
 
 STRATEGY_METHODS = {

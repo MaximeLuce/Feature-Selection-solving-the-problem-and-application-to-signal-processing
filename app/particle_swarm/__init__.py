@@ -1,3 +1,3 @@
-from .algorithm import NewBinaryParticleSwarmOptimization
+from .algorithm import NovelBinaryParticleSwarmOptimization
 
-__all__ = ["NewBinaryParticleSwarmOptimization"]
+__all__ = ["NovelBinaryParticleSwarmOptimization"]

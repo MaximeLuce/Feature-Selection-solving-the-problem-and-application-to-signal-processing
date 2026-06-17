@@ -35,8 +35,8 @@ class Monitor:
         self.reset()
 
     @staticmethod
-    def _population_diversity(masks: np.ndarray) -> float:
-        """Average Hamming distance from the centroid (O(n·d))."""
+    def _hamming_distance(masks: np.ndarray) -> float:
+        """Average Hamming distance from the centroid (O(n*d))."""
         masks = np.asarray(masks, dtype=float)
         centroid = (masks.mean(axis=0) > 0.5).astype(int)
         return float(np.mean(np.sum(masks != centroid, axis=1)))
@@ -94,8 +94,8 @@ class Monitor:
             record["best_fitness"] = self.seen_best_fitness
         if MonitoringMetric.BEST_MASK in self.metrics:
             record["best_mask"] = list(self.seen_best_mask) if self.seen_best_mask is not None else None
-        if MonitoringMetric.POPULATION_DIVERSITY in self.metrics and masks is not None:
-            record["population_diversity"] = self._population_diversity(masks)
+        if MonitoringMetric.HAMMING_DISTANCE in self.metrics and masks is not None:
+            record["population_diversity"] = self._hamming_distance(masks)
 
         self.records.append(record)
 

@@ -1,20 +1,12 @@
+# app/runners/nbpso_parameters.py
+
 import os
-
-for env_var in (
-    "OMP_NUM_THREADS",
-    "OPENBLAS_NUM_THREADS",
-    "MKL_NUM_THREADS",
-    "VECLIB_MAXIMUM_THREADS",
-    "NUMEXPR_NUM_THREADS",
-):
-    os.environ.setdefault(env_var, "1")
-
 import numpy as np
 
-from app.monitoring import MonitoringMetric
+from app.Archive.monitoring import MonitoringMetric
 from app.Problem.Problem import Problem
-from app.Utilities.ConfigLoader import load_config
-from app.particle_swarm.algorithm import NewBinaryParticleSwarmOptimization
+from app.utilities.config_loader import load_config
+from app.particle_swarm.algorithm import NovelBinaryParticleSwarmOptimization
 from app.runners.common import (
     build_rebuilt_csv_path,
     build_run_configs,
@@ -95,7 +87,7 @@ def run_nbpso_config(config):
     monitoring["metrics"] = monitoring_metrics
     nbpso_config["monitoring"] = monitoring
 
-    nbpso = NewBinaryParticleSwarmOptimization(problem, nbpso_config)
+    nbpso = NovelBinaryParticleSwarmOptimization(problem, nbpso_config)
     result = nbpso.run()
 
     if result.wall_ns is None:

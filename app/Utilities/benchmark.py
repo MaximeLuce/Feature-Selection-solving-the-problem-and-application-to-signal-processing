@@ -1,6 +1,6 @@
 import numpy as np
 
-from .results import PopulationEvaluation
+from app.differential_evolution.results import PopulationEvaluation
 
 
 class BenchmarkProblem:
