@@ -5,7 +5,7 @@ import numpy as np
 from app.Problem.DataLoader import DataLoader
 from app.Problem.Evaluator import Evaluator, KNNEvaluator, RFEvaluator, SVMEvaluator
 from app.Problem.Fitness import ErrorFitness, Fitness, WeightedErrorFitness
-from app.Utilities.ConfigLoader import load_config
+from app.utilities.config_loader import load_config
 
 
 class Problem:

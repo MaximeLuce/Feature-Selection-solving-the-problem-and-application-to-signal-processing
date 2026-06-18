@@ -6,10 +6,7 @@ import os
 from concurrent.futures import ProcessPoolExecutor, as_completed
 
 import filelock
-from numpy import true_divide
 from tqdm import tqdm
-
-from app.runners.analysis import summarize_group
 
 
 def build_run_configs(dataset_ids, cases, evaluation_cases, runs_per_algo):
@@ -55,19 +52,6 @@ def validate_and_order_row(row, columns):
     if missing:
         raise ValueError(f"Missing CSV columns: {missing}")
     return {column: row[column] for column in columns}
-
-
-def ensure_csv_header(csv_filepath, columns):
-    if not os.path.isfile(csv_filepath):
-        return
-
-    with open(csv_filepath, mode="r", newline="") as file:
-        reader = csv.reader(file, delimiter=";")
-        existing_header = next(reader, None)
-    if existing_header != columns:
-        raise ValueError(
-            f"CSV header mismatch for {csv_filepath}. "
-        )
 
 
 def write_csv_rows(csv_filepath, columns, rows, append=True):
@@ -177,6 +161,7 @@ def rebuild_grouped_csv_from_raw(
 ):
 
     records = read_raw_jsonl(raw_filepath)
+    from app.runners.analysis import summarize_group
     summary = summarize_group(records, group_fields)
     rows = [build_row_from_schema(row.to_dict(), csv_schema) for _, row in summary.iterrows()]
 
@@ -242,8 +227,6 @@ def run_configs(
     parallel=True,
     max_workers=None,
 ):
-    columns = [item["column"] for item in csv_schema]
-
     pending_groups = _pending_groups(configurations, group_fields, csv_schema, csv_filepath)
     pending_configs = [config for _, group in pending_groups for config in group]
     results = {group_id: [] for group_id, _ in pending_groups}

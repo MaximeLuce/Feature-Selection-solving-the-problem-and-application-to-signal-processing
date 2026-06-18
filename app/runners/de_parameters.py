@@ -211,19 +211,6 @@ class DEParameters:
             max_workers=self.max_workers,
         )
 
-    def rebuild_summary_from_raw(self, output_csv_filepath=None):
-        raw_filepath = os.path.join(RAW_DIR, RAW_FILENAME)
-        rebuilt_csv_filepath = output_csv_filepath or build_rebuilt_csv_path(
-            self.csv_filepath
-        )
-        return rebuild_grouped_csv_from_raw(
-            raw_filepath=raw_filepath,
-            csv_filepath=self.csv_filepath,
-            csv_schema=DE_CSV_SCHEMA,
-            group_fields=DE_GROUP_FIELDS,
-            output_csv_filepath=rebuilt_csv_filepath,
-        )
-
 
 if __name__ == "__main__":
     runner = DEParameters()
