@@ -1,71 +1,67 @@
-# Feature-Selection-solving-the-problem-and-application-to-signal-processing
-Feature Selection : solving the problem and application to signal processing
+# Feature Selection
 
-## Context of this project
+Comparative study of optimization algorithms for the **Feature Selection** problem. Part of the *Optimization Methods: Theory and Applications* course at Wrocław University of Science and Technology.
 
-This project is a part of the course "Optimization Methods: Theory and Applications" at the Wroclaw Univeristy of Science and Technology (project).
+## Algorithms
 
-It aims to study the Feature Selection which is an NP-hard problem. The purpose of this project is to compare efficently different algorithms to solve it. We will compare:
+| Algorithm | Type | Key Parameters |
+|-----------|------|----------------|
+| **BDE** — Binary Differential Evolution | Population (DE) | $strategy, NP, G, F, CR$|
+| **AMDE** — Angle Modulation DE | Population (DE) | $strategy, NP, G, F, C |
+| **SA** — Simulated Annealing | Single-solution | $T_0$, $\alpha$ |
+| **NBPSO** — Novel Binary PSO | Swarm | S, G,  |
+| **NBPSO-LDIW** — NBPSO with linearly decreasing inertia | Swarm | $S, G, \lambda, c_1, c_2$ 
 
-- Simulated Annealing (SA) with two parameters
-  - initial temperature
-  - cooling rate
-- Differential Evolution (DE) (to be continued)
-- Particle Swarm Optimization (PSO) (to be continued)
+## Evaluators
 
-(MAYBE)
-- random search (maybe)
-- Evolutionary Algorithm (EA) with different parameters (maybe)
-  - Population size
-  - Crossover probability
-  - Mutation probability
-  - Tour size
-  - Number of generation
-  - Crossover methods : OX and PMX
-  - Mutation methods : Swap or Inversion
-
-In order to do that, we will use (and compare ?) Machine Learning:
-
-- kNN for light model
-- SVM for heavy model used as a baseline (comparison with others ?)
-
-## Use
-
-1) Load the project
-2) On the main folder, run `python -m app.main`
-3) If you want to access a specific file (e.g., a Test File), use `python -m app.Tests.TestSA`
+- **SVM** (heavy) — `StandardScaler` + `SVC(RBF)`, $C=1.0, \gamma=scale, 5-fold CV$
+- **k-NN** (light) — `KNeighborsClassifier`, $k=5$, 5-fold $CV$
 
 ## Datasets
 
-Description TO DO
+| ID | Name | Features | Instances | Source |
+|----|------|----------|-----------|--------|
+| 174 | Parkinsons | 22 | 197 | [UCI](https://archive.ics.uci.edu/dataset/174/parkinsons) |
+| 17 | Breast Cancer Wisconsin | 30 | 569 | [UCI](https://archive.ics.uci.edu/dataset/17/breast+cancer+wisconsin+diagnostic) |
+| 52 | Ionosphere | 34 | 351 | [UCI](https://archive.ics.uci.edu/dataset/52/ionosphere) |
+| 151 | Sonar: Mines vs Rocks | 60 | 208 | [UCI](https://archive.ics.uci.edu/dataset/151/connectionist+bench+sonar+mines+vs+rocks) |
 
-1) https://archive.ics.uci.edu/dataset/174/parkinsons
-2) https://archive.ics.uci.edu/dataset/17/breast+cancer+wisconsin+diagnostic
-3) https://archive.ics.uci.edu/dataset/52/ionosphere
-4) https://archive.ics.uci.edu/dataset/151/connectionist+bench+sonar+mines+vs+rocks
-5) https://www.kaggle.com/datasets/meruvakodandasuraj/sonar-dataset-underwater-object-classification?resource=download
+## Project Structure
 
-More infos on UCI https://github.com/uci-ml-repo/ucimlrepo
+```
+app/
+  core/                    # config, I/O helpers, monitoring
+  problem/                 # dataset loading, fitness, evaluators, masks
+  decoders/                # binary decoders (sigma, angle modulation)
+  differential_evolution/  # DE algorithms
+  simulated_annealing/     # SA algorithm
+  particle_swarm/          # NBPSO algorithm
+  runners/                 # parameter sweeps, analysis, plots
+  Results/                 # raw JSONL run data, summary CSVs
+  Data/                    # dataset CSV files (ultimately not used)
+  config.json              # experiment configurations for runs
+```
 
-## Naviguation
+## Usage
 
-- `app`: all the pythons file of the project
-    - `Data`: instance of the problem (commin from [GitHub Pages]([https://pages.github.com/](https://github.com/chneau/go-taillard/tree/master/pfsp/instances))
-    - `Utilities`: EALogger, ExperimentRunner
-    - `Tests`: Unit tests on the class
-    - `Problem`: DataLoader, Individual, Problem
-    - `OptimizationAlgorithm`: EvolutionaryAlgorithm, OptimizationAlgorithm, RandomSearch
-    - `Results`: folder where all csv were exported and contains file to export CSV to LaTeX tables
-    - `Archive`: old files
-- `Topic`: PDF files of the exercise goal and description
-- `Report`: Report on the project
-- `Figures`: Convergence graphs and figures
-- `Notes`: some of my notes during the project
+```shell
+# run experiments defined in config.json (modify output paths and config groups!)
+python -m app.runners.de_parameters
 
-### Modules used for this project
+python -m app.runners.sa_parameters
 
-#### Standard and external modules
+python -m app.runners.nbpso_parameters
 
-#### Built-ins
+# run analysis defined in main
+python -m app.runners.analysis
 
-#### Methods for lists, strings and files
+```
+## Results
+
+Tables used to generate tables in the report are available in `app/Results/summary/`.
+
+Data for analysis in `app/Results/raw/` is too voluminous to be included.
+
+Best found solutions are saved in `best_solutions.csv`.
+
+Report placed in `report.pdf`.
