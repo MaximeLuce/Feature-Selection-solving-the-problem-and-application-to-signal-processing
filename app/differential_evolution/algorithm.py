@@ -1,7 +1,7 @@
 # app/differential_evolution/algorithm.py
 
 import numpy as np
-from app.Archive.monitoring import Monitor
+from app.monitoring import Monitor
 from app.differential_evolution.results import DEResult, PopulationEvaluation
 
 

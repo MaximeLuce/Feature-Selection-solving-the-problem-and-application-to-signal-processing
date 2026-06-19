@@ -2,14 +2,14 @@
 
 import numpy as np
 
-from app.Archive.monitoring import MonitoringMetric
+from app.monitoring import MonitoringMetric
+from app.core.config import load_config
+from app.core.io import save_raw_run_result
 from app.simulated_annealing.algorithm import SimulatedAnnealing
-from app.Problem.Problem import Problem
-from app.utilities.config_loader import load_config
+from app.problem import Problem
 from app.runners.common import (
     build_run_configs,
     run_configs,
-    save_raw_run_result,
 )
 
 SA_CSV_SCHEMA = [
@@ -114,7 +114,7 @@ def run_sa_config(config):
         },
         "history": result.history,
     }
-    save_raw_run_result(RAW_DIR, raw_data, RAW_FILENAME)
+    save_raw_run_result(f"{RAW_DIR}/{RAW_FILENAME}", raw_data)
 
     return {
         "run_id": config["run_id"],

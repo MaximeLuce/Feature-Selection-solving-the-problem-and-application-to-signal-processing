@@ -3,15 +3,13 @@ import math
 
 import numpy as np
 
-from app.Archive.monitoring import Monitor
-from app.Archive.OptimizationAlgorithm import OptimizationAlgorithm
-from app.Problem.Individual import Individual
-from app.utilities.masks import repair_zero_mask
-
+from app.monitoring import Monitor
+from app.problem.individual import Individual
+from app.problem.masks import repair_zero_mask
 from app.simulated_annealing.results import SAResult
 
 
-class SimulatedAnnealing(OptimizationAlgorithm):
+class SimulatedAnnealing:
     DEFAULT_MONITORING = {
         "metrics": [],
         "record_every": 1,
@@ -27,7 +25,7 @@ class SimulatedAnnealing(OptimizationAlgorithm):
         min_temperature=1e-10,
         monitoring=None,
     ):
-        super().__init__(problem)
+        self.problem = problem
         self.max_evaluations = max_evaluations
         self.initial_temp = initial_temp
         self.cooling_rate = cooling_rate

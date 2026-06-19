@@ -1,7 +1,7 @@
 import numpy as np
 
-from app.Archive.monitoring import Monitor
-from app.Utilities.masks import repair_zero_masks
+from app.monitoring import Monitor
+from app.problem.masks import repair_zero_masks
 
 from .results import NBPSOResult
 

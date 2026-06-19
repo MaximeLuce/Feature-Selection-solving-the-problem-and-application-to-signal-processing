@@ -2,19 +2,17 @@
 import os
 import numpy as np
 
-from app.Archive.monitoring import MonitoringMetric
+from app.monitoring import MonitoringMetric
+from app.core.config import load_config
+from app.core.io import save_raw_run_result
 from app.decoders import build_decoder
-from app.differential_evolution.algorithm import DifferentialEvolution
-from app.differential_evolution.featureselection import DecodedFeatureSelectionProblem
-from app.Problem import Problem
+from app.differential_evolution import DifferentialEvolution
+from app.differential_evolution import DecodedFeatureSelectionProblem
+from app.problem import Problem
 from app.runners.common import (
-    build_rebuilt_csv_path,
     build_run_configs,
-    rebuild_grouped_csv_from_raw,
     run_configs,
-    save_raw_run_result,
 )
-from app.utilities.config_loader import load_config
 
 DE_CSV_SCHEMA = [
     {"column": "Case_ID", "key": "case_id"},
@@ -134,7 +132,7 @@ def run_de_config(config):
         },
         "history": result.history,
     }
-    save_raw_run_result(RAW_DIR, raw_data, RAW_FILENAME)
+    save_raw_run_result(os.path.join(RAW_DIR, RAW_FILENAME), raw_data)
 
     return {
         "run_id": config["run_id"],

@@ -1,6 +1,7 @@
 import numpy as np
-from app.Utilities.masks import repair_zero_masks
-from .results import PopulationEvaluation
+
+from app.problem.masks import repair_zero_masks
+from app.differential_evolution.results import PopulationEvaluation
 
 
 class DecodedFeatureSelectionProblem:
