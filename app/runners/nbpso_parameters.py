@@ -1,26 +1,16 @@
+# app/runners/nbpso_parameters.py
+
 import os
-
-for env_var in (
-    "OMP_NUM_THREADS",
-    "OPENBLAS_NUM_THREADS",
-    "MKL_NUM_THREADS",
-    "VECLIB_MAXIMUM_THREADS",
-    "NUMEXPR_NUM_THREADS",
-):
-    os.environ.setdefault(env_var, "1")
-
 import numpy as np
 
 from app.monitoring import MonitoringMetric
-from app.Problem.Problem import Problem
-from app.Utilities.ConfigLoader import load_config
-from app.particle_swarm.algorithm import NewBinaryParticleSwarmOptimization
+from app.core.config import load_config
+from app.core.io import save_raw_run_result
+from app.problem import Problem
+from app.particle_swarm.algorithm import NovelBinaryParticleSwarmOptimization
 from app.runners.common import (
-    build_rebuilt_csv_path,
     build_run_configs,
-    rebuild_grouped_csv_from_raw,
     run_configs,
-    save_raw_run_result,
 )
 
 NBPSO_CSV_SCHEMA = [
@@ -95,7 +85,7 @@ def run_nbpso_config(config):
     monitoring["metrics"] = monitoring_metrics
     nbpso_config["monitoring"] = monitoring
 
-    nbpso = NewBinaryParticleSwarmOptimization(problem, nbpso_config)
+    nbpso = NovelBinaryParticleSwarmOptimization(problem, nbpso_config)
     result = nbpso.run()
 
     if result.wall_ns is None:
@@ -144,7 +134,7 @@ def run_nbpso_config(config):
         },
         "history": result.history,
     }
-    save_raw_run_result(RAW_DIR, raw_data, RAW_FILENAME)
+    save_raw_run_result(os.path.join(RAW_DIR, RAW_FILENAME), raw_data)
 
     return {
         "run_id": config["run_id"],
@@ -204,17 +194,6 @@ class NBPSOParameters:
             group_fields=NBPSO_GROUP_FIELDS,
             parallel=parallel,
             max_workers=self.max_workers,
-        )
-
-    def rebuild_summary_from_raw(self, output_csv_filepath=None):
-        raw_filepath = os.path.join(RAW_DIR, RAW_FILENAME)
-        rebuilt_csv_filepath = output_csv_filepath or build_rebuilt_csv_path(self.csv_filepath)
-        return rebuild_grouped_csv_from_raw(
-            raw_filepath=raw_filepath,
-            csv_filepath=self.csv_filepath,
-            csv_schema=NBPSO_CSV_SCHEMA,
-            group_fields=NBPSO_GROUP_FIELDS,
-            output_csv_filepath=rebuilt_csv_filepath,
         )
 
 

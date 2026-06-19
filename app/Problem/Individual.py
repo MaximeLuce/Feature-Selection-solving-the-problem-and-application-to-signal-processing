@@ -1,5 +1,4 @@
 import random
-import copy
 
 class Individual:
     """Represents a potential solution (an individual which is a subset of features)."""

@@ -95,3 +95,6 @@ scalene-de-smoke.json
 uv.lock
 .vscode
 app/Results/raw/
+app/Results/raw copy/
+_temp*
+app/Results/summary copy/

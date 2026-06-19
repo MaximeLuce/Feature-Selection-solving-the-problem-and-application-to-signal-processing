@@ -1,26 +1,15 @@
-import os
-
-for env_var in (
-    "OMP_NUM_THREADS",
-    "OPENBLAS_NUM_THREADS",
-    "MKL_NUM_THREADS",
-    "VECLIB_MAXIMUM_THREADS",
-    "NUMEXPR_NUM_THREADS",
-):
-    os.environ.setdefault(env_var, "1")
+# app/runners/sa_parameters.py
 
 import numpy as np
 
 from app.monitoring import MonitoringMetric
-from app.OptimizationAlgorithm.SimulatedAnnealing import SimulatedAnnealing
-from app.Problem.Problem import Problem
-from app.Utilities.ConfigLoader import load_config
+from app.core.config import load_config
+from app.core.io import save_raw_run_result
+from app.simulated_annealing.algorithm import SimulatedAnnealing
+from app.problem import Problem
 from app.runners.common import (
-    build_rebuilt_csv_path,
     build_run_configs,
-    rebuild_grouped_csv_from_raw,
     run_configs,
-    save_raw_run_result,
 )
 
 SA_CSV_SCHEMA = [
@@ -93,6 +82,11 @@ def run_sa_config(config):
 
     best_mask = np.array(result.best_mask, dtype=int)
     final_score = float(problem.evaluate_final(best_mask) * 100)
+    
+    if result.wall_ns is None:
+        raise ValueError("SA result is missing wall_ns timing data.")
+    if result.cpu_ns is None:
+        raise ValueError("SA result is missing cpu_ns timing data.")
 
     # Append raw result to shared JSONL file
     raw_data = {
@@ -120,7 +114,7 @@ def run_sa_config(config):
         },
         "history": result.history,
     }
-    save_raw_run_result(RAW_DIR, raw_data, RAW_FILENAME)
+    save_raw_run_result(f"{RAW_DIR}/{RAW_FILENAME}", raw_data)
 
     return {
         "run_id": config["run_id"],
@@ -177,17 +171,6 @@ class SAParameters:
             configurations, run_sa_config, self.csv_filepath, SA_CSV_SCHEMA,
             group_fields=SA_GROUP_FIELDS,
             max_workers=14
-        )
-
-    def rebuild_summary_from_raw(self, output_csv_filepath=None):
-        raw_filepath = os.path.join(RAW_DIR, RAW_FILENAME)
-        rebuilt_csv_filepath = output_csv_filepath or build_rebuilt_csv_path(self.csv_filepath)
-        return rebuild_grouped_csv_from_raw(
-            raw_filepath=raw_filepath,
-            csv_filepath=self.csv_filepath,
-            csv_schema=SA_CSV_SCHEMA,
-            group_fields=SA_GROUP_FIELDS,
-            output_csv_filepath=rebuilt_csv_filepath,
         )
 
 

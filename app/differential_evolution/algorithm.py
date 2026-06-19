@@ -2,7 +2,7 @@
 
 import numpy as np
 from app.monitoring import Monitor
-from .results import DEResult, PopulationEvaluation
+from app.differential_evolution.results import DEResult, PopulationEvaluation
 
 
 STRATEGY_METHODS = {

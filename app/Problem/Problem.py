@@ -1,11 +1,11 @@
-# app/Problem/Problem.py
+# app/problem/problem.py
 
 import numpy as np
 
-from app.Problem.DataLoader import DataLoader
-from app.Problem.Evaluator import Evaluator, KNNEvaluator, RFEvaluator, SVMEvaluator
-from app.Problem.Fitness import ErrorFitness, Fitness, WeightedErrorFitness
-from app.Utilities.ConfigLoader import load_config
+from app.core.config import load_config
+from app.problem.data_loading import DataLoader
+from app.problem.evaluators import Evaluator, KNNEvaluator, RFEvaluator, SVMEvaluator
+from app.problem.fitness import ErrorFitness, Fitness, WeightedErrorFitness
 
 
 class Problem:
